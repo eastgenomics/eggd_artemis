@@ -145,9 +145,11 @@ def get_cnv_file_ids(reports,gcnv_dict):
         cnv_data (dict): Nested ictionary of files with sample name
             as key and a list of files as values with key labels
     """
+    cnv_data = {}
+
     for report in reports:
         sample = report['describe']['name'].split("_")[0]
-
+        print(sample)
         gen_xlsx_job = report["describe"]["createdBy"]["job"]
 
         # Find the reports workflow analysis id
@@ -176,9 +178,10 @@ def get_cnv_file_ids(reports,gcnv_dict):
             'CNV calls for IGV': seg_id
         }
 
-        return cnv_data
 
-def get_exlcuded_file(gcnv_output_dict):
+    return cnv_data
+
+def get_excluded_intervals(gcnv_output_dict):
     """ Get the excluded regions file from the gcnv dictionary
 
     Args:
@@ -250,40 +253,6 @@ def make_url(file_id, project, url_duration=2419200):
         return file_url
 
 
-def create_links_file(output_file,data):
-    """ Create output file containing lins
-
-    Args:
-        data (dict): dictionary of samples with file ids
-    """
-    # Set timestamps
-    now = datetime.datetime.now().strftime("%Y-%m-%d")
-    expiry = datetime.timedelta(days=14)
-
-    expiry_date=(datetime.datetime.strptime(datetime.datetime.now().strftime('%Y-%m-%d'), '%Y-%m-%d') + datetime.timedelta(seconds=604800)).strftime('%Y-%m-%d')
-
-    # Write file
-    with open(output_file, 'w') as f:
-            f.write(f"Run:\t{DX_PROJECT_NAME}\n\n")
-            f.write(f"Date Created:\t {str(datetime.datetime.now())}\n")
-            f.write(f"Expiry Date:\t{str(expiry_date)}\n\n")
-            f.write("Run level files\n")
-            f.write(f"MultiQC report\t {make_url(multiqc,DX_PROJECT)}\n")
-            f.write(f"QC Status report\t/path/2/url/to/add\n")
-            f.write('Per Sample files\n')
-
-            for sample,details in data.items():
-                f.write(f"Sample ID:\t{sample}\n")
-                f.write(f"Coverage report:\t{make_url(details['Coverage report'],DX_PROJECT)}\n")
-                f.write(f"SNV variant report:\t{make_url(details['SNV variant report'],DX_PROJECT)}\n")
-                f.write(f"CNV variant report:\t{make_url(details['CNV variant report'],DX_PROJECT)}\n\n")
-                f.write(f"Alignment BAM:\t{make_url(details['Alignment BAM'],DX_PROJECT)}\n")
-                f.write(f"Alignment BAI:\t{make_url(details['Alignment BAI'],DX_PROJECT)}\n")
-                f.write(f"CNV visualisation:\t{make_url(details['CNV visualisation'],DX_PROJECT)}\n")
-                f.write(f"CNV calls for IGV:\t{make_url(details['CNV calls for IGV'],DX_PROJECT)}\n\n")
-                f.write(f"CNV excluded regions\t{make_url(excluded_intervals,DX_PROJECT)}\n")
-                f.write(f"CNV targets\t{bed_file_url}\n\n")
-
 @dxpy.entry_point('main')
 def main(url_duration, make_sessions, snv_path=None, cnv_path=None,bed_file=None):
 
@@ -325,7 +294,7 @@ def main(url_duration, make_sessions, snv_path=None, cnv_path=None,bed_file=None
         cnv_files = get_cnv_file_ids(cnv_reports,gcnv_job_info)
 
         # Get excluded intervals file
-        excluded_intervals = get_excluded_intervals(gcnv_job_info)
+        excluded_intervals =get_excluded_intervals(gcnv_job_info)
 
         # Get multiqc report
         multiqc = get_multiqc_report(cnv_path,DX_PROJECT)
@@ -335,20 +304,50 @@ def main(url_duration, make_sessions, snv_path=None, cnv_path=None,bed_file=None
 
     data = {}
 
-    merge(data, snv_files, cnv_data)
+    merge(data, snv_files, cnv_files)
 
 
     # Write output file
     # Note2self - add version number to output file name??
     today = datetime.datetime.now().strftime("%Y%m%d")
     output_name = f"{DX_PROJECT_NAME[4:]}_{today}.tsv"
-    create_links_file(output_name,data)
+
+    # Set timestamps
+    now = datetime.datetime.now().strftime("%Y-%m-%d")
+    expiry = datetime.timedelta(days=14)
+
+    expiry_date=(datetime.datetime.strptime(datetime.datetime.now().strftime('%Y-%m-%d'), '%Y-%m-%d') + datetime.timedelta(seconds=604800)).strftime('%Y-%m-%d')
+
+
+    # Write file
+    with open(output_name, 'w') as f:
+            f.write(f"Run:\t{DX_PROJECT_NAME}\n\n")
+            f.write(f"Date Created:\t{str(datetime.datetime.now())}\n")
+            f.write(f"Expiry Date:\t{str(expiry_date)}\n\n")
+            f.write("Run level files\n")
+            f.write(f"MultiQC report\t {make_url(multiqc,DX_PROJECT)}\n")
+            f.write(f"QC Status report\t/path/2/url/to/add\n")
+            f.write('Per Sample files\n')
+
+            for sample,details in data.items():
+                print(sample)
+                print(details)
+                f.write(f"Sample ID:\t{sample}\n")
+                f.write(f"Coverage report:\t{make_url(details['Coverage report'],DX_PROJECT)}\n")
+                f.write(f"SNV variant report:\t{make_url(details['SNV variant report'],DX_PROJECT)}\n")
+                f.write(f"CNV variant report:\t{make_url(details['CNV variant report'],DX_PROJECT)}\n\n")
+                f.write(f"Alignment BAM:\t{make_url(details['Alignment BAM'],DX_PROJECT)}\n")
+                f.write(f"Alignment BAI:\t{make_url(details['Alignment BAI'],DX_PROJECT)}\n")
+                f.write(f"CNV visualisation:\t{make_url(details['CNV visualisation'],DX_PROJECT)}\n")
+                f.write(f"CNV calls for IGV:\t{make_url(details['CNV calls for IGV'],DX_PROJECT)}\n\n")
+                f.write(f"CNV excluded regions\t{make_url(excluded_intervals,DX_PROJECT)}\n")
+                f.write(f"CNV targets\t{bed_file_url}\n\n")
 
     # Upload output to the platform
     output = {}
     url_file = dxpy.upload_local_file(output_name)
     output["url_file"] = dxpy.dxlink(url_file)
-    output["session_files"] = [dxpy.dxlink(item) for item in session_files]
+    #output["session_files"] = [dxpy.dxlink(item) for item in session_files]
 
     return output
 

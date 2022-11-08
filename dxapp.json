@@ -57,6 +57,7 @@
       "name": "session_files",
       "label": "array:file",
       "class": "array:file",
+      "optional": true,
       "patterns": [
         "*"
       ],
