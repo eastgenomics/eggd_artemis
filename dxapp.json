@@ -1,0 +1,92 @@
+{
+  "name": "eggd_artemis",
+  "title": "eggd_artemis",
+  "summary": "Gathers required files and creates file containing urls for them.",
+  "dxapi": "1.0.0",
+  "version": "0.0.1",
+  "inputSpec": [
+    {
+      "name": "snv_path",
+      "label": "Path to SNV reports",
+      "class": "string",
+      "optional": true,
+      "help": ""
+    },
+    {
+      "name": "cnv_path",
+      "label": "Path to CNV reports",
+      "class": "string",
+      "optional": true,
+      "help": ""
+    },
+    {
+      "name": "url_duration",
+      "label": "Active url duration",
+      "class": "int",
+      "optional": true,
+      "default": 1209600,
+      "help": ""
+    },
+    {
+      "name": "bed_file",
+      "label": "Capture bed file",
+      "class": "file",
+      "optional": true,
+      "help": ""
+    },
+    {
+      "name": "make_sessions",
+      "label": "Boolean option to create session files",
+      "class": "boolean",
+      "optional": true,
+      "default": false,
+      "help": ""
+    }
+  ],
+  "outputSpec": [
+    {
+      "name": "url_file",
+      "label": "File contraining download links",
+      "class": "file",
+      "patterns": [
+        "*"
+      ],
+      "help": ""
+    },
+    {
+      "name": "session_files",
+      "label": "array:file",
+      "class": "array:file",
+      "optional": true,
+      "patterns": [
+        "*"
+      ],
+      "help": ""
+    }
+  ],
+  "runSpec": {
+    "timeoutPolicy": {
+      "*": {
+        "hours": 1
+      }
+    },
+    "interpreter": "python3",
+    "file": "src/eggd_artemis.py",
+    "distribution": "Ubuntu",
+    "release": "20.04",
+    "version": "0"
+  },
+  "access": {
+    "project": "CONTRIBUTE",
+    "allProjects": "VIEW"
+  },
+  "regionalOptions": {
+    "aws:eu-central-1": {
+      "systemRequirements": {
+        "*": {
+          "instanceType": "mem1_ssd1_v2_x2"
+        }
+      }
+    }
+  }
+}
