@@ -4,7 +4,7 @@
 
 ## What does this app do?
 
-Gathers required files and creates file containing urls for to allow file download within CUH & the LGLs.
+Gathers required files and creates file containing urls to allow file download within CUH & the LGLs.
 
 ## What inputs are required for this app to run?
 * `snv_path`: List of absolute paths to folder containing the variant reports for small variants

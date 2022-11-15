@@ -24,7 +24,7 @@
     },
     {
       "name": "url_duration",
-      "label": "Active url duration",
+      "label": "Active url duration in seconds",
       "class": "int",
       "optional": true,
       "default": 1209600,
