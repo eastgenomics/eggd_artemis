@@ -3,7 +3,10 @@
   "title": "eggd_artemis",
   "summary": "Gathers required files and creates file containing urls for them.",
   "dxapi": "1.0.0",
-  "version": "0.0.1",
+  "version": "1.0.0",
+  "properties": {
+    "githubRelease": "1.0.0"
+    },
   "inputSpec": [
     {
       "name": "snv_path",
@@ -76,6 +79,12 @@
     "release": "20.04",
     "version": "0"
   },
+  "developers":[
+    "org-emee_1"
+  ],
+  "authorizedUsers": [
+    "org-emee_1"
+  ],
   "access": {
     "project": "CONTRIBUTE",
     "allProjects": "VIEW"
