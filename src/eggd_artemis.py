@@ -250,6 +250,12 @@ def make_url(file_id, project, url_duration=2419200):
                 duration=url_duration, preauthenticated=True,
                 project=project, filename=file_name)[0]
 
+        workstation_hostname = file_url.split('/')[2]
+        dx_hostname = 'dl.ec1.dnanex.us'
+
+        file_url = file_url.replace(workstation_hostname,dx_hostname)
+        file_url = file_url.replace('http','https')
+
         return file_url
 
 
@@ -265,46 +271,65 @@ def main(url_duration, make_sessions, snv_path=None, cnv_path=None,bed_file=None
 
     # Gather required SNV files if SNV path is provided
     if snv_path is not None:
-        print(snv_path)
-        #logger.info("Gathering SNV report information")
-        snv_reports = list(dxpy.bindings.search.find_data_objects(
-            name="*xlsx",
-            name_mode='glob',
-            folder=snv_path,
-            project=DX_PROJECT,
-            describe=True))
 
-        # Get SNV ids
-        snv_files = find_snv_files(snv_reports)
+        snv_data = {}
+
+        for path in snv_path.split(','):
+        #logger.info("Gathering SNV report information")
+            print (f'Gathering reports from: {path}')
+            snv_reports = list(dxpy.bindings.search.find_data_objects(
+                name="*xlsx",
+                name_mode='glob',
+                folder=path,
+                project=DX_PROJECT,
+                describe=True))
+
+            # Get SNV ids
+            snv_files = find_snv_files(snv_reports)
+            merge (snv_data,snv_files)
         # Get multiqc report
-        multiqc = get_multiqc_report(snv_path,DX_PROJECT)
+        multiqc = get_multiqc_report(snv_path.split(',')[0],DX_PROJECT)
 
     # Gather required CNV files if CNV path is provided
     if cnv_path is not None:
-        print(cnv_path)
-        #logger.info("Gathering CNV report information")
-        cnv_reports = list(dxpy.bindings.search.find_data_objects(
-            name="*xlsx",
-            name_mode='glob',
-            folder=cnv_path,
-            project=DX_PROJECT,
-            describe=True))
 
-        gcnv_job_info = get_cnv_call_details(cnv_reports)
-        cnv_files = get_cnv_file_ids(cnv_reports,gcnv_job_info)
+        cnv_data = {}
 
-        # Get excluded intervals file
-        excluded_intervals =get_excluded_intervals(gcnv_job_info)
+        for path in cnv_path.split(','):
+            print(path)
+            #logger.info("Gathering CNV report information")
+            cnv_reports = list(dxpy.bindings.search.find_data_objects(
+                name="*xlsx",
+                name_mode='glob',
+                folder=path,
+                project=DX_PROJECT,
+                describe=True))
 
+            gcnv_job_info = get_cnv_call_details(cnv_reports)
+            cnv_files = get_cnv_file_ids(cnv_reports,gcnv_job_info)
+
+            # Get excluded intervals file
+            excluded_intervals = get_excluded_intervals(gcnv_job_info)
+            merge(cnv_data,cnv_files)
         # Get multiqc report
-        multiqc = get_multiqc_report(cnv_path,DX_PROJECT)
+        multiqc = get_multiqc_report(cnv_path.split(',')[0],DX_PROJECT)
 
     if bed_file is not None:
         bed_file_url = make_url(bed_file, 'project-Fkb6Gkj433GVVvj73J7x8KbV')
+    else:
+        bed_file_url = 'No targets bed file provided'
 
     data = {}
 
-    merge(data, snv_files, cnv_files)
+    if snv_path and cnv_path:
+        merge(data, snv_data, cnv_data)
+    elif snv_path:
+        data = snv_data
+    elif cnv_path:
+        data = cnv_data
+    else:
+        print ('No paths given, exiting...')
+        exit(1)
 
 
     # Write output file
@@ -333,15 +358,21 @@ def main(url_duration, make_sessions, snv_path=None, cnv_path=None,bed_file=None
                 print(sample)
                 print(details)
                 f.write(f"Sample ID:\t{sample}\n")
-                f.write(f"Coverage report:\t{make_url(details['Coverage report'],DX_PROJECT)}\n")
-                f.write(f"SNV variant report:\t{make_url(details['SNV variant report'],DX_PROJECT)}\n")
-                f.write(f"CNV variant report:\t{make_url(details['CNV variant report'],DX_PROJECT)}\n\n")
+                if snv_path is not None:
+                    f.write(f"Coverage report:\t{make_url(details['Coverage report'],DX_PROJECT)}\n")
+                    f.write(f"SNV variant report:\t{make_url(details['SNV variant report'],DX_PROJECT)}\n")
+
+                if cnv_path is not None:
+                    f.write(f"CNV variant report:\t{make_url(details['CNV variant report'],DX_PROJECT)}\n\n")
+
                 f.write(f"Alignment BAM:\t{make_url(details['Alignment BAM'],DX_PROJECT)}\n")
                 f.write(f"Alignment BAI:\t{make_url(details['Alignment BAI'],DX_PROJECT)}\n")
-                f.write(f"CNV visualisation:\t{make_url(details['CNV visualisation'],DX_PROJECT)}\n")
-                f.write(f"CNV calls for IGV:\t{make_url(details['CNV calls for IGV'],DX_PROJECT)}\n\n")
-                f.write(f"CNV excluded regions\t{make_url(excluded_intervals,DX_PROJECT)}\n")
-                f.write(f"CNV targets\t{bed_file_url}\n\n")
+
+                if cnv_path is not None:
+                    f.write(f"CNV visualisation:\t{make_url(details['CNV visualisation'],DX_PROJECT)}\n")
+                    f.write(f"CNV calls for IGV:\t{make_url(details['CNV calls for IGV'],DX_PROJECT)}\n\n")
+                    f.write(f"CNV excluded regions\t{make_url(excluded_intervals,DX_PROJECT)}\n")
+                    f.write(f"CNV targets\t{bed_file_url}\n\n")
 
     # Upload output to the platform
     output = {}
