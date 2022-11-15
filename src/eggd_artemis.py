@@ -18,18 +18,8 @@ import datetime
 import subprocess
 import logging
 
-# set up logging
-# logger = logging.getLogger(__name__)
-# logger.addHandler(dxpy.DXLogHandler())
-# logger.propagate = False
-# logger.setLevel(logging.DEBUG)
-
-
 
 # Install merge dict package
-#bash_cmd = "python3 -m pip install --no-index --no-deps packages/*.whl"
-#subprocess.run(bash_cmd.split())
-
 for package in os.listdir("/home/dnanexus/packages"):
     print(f"Installing {package}")
     pip.main(["install","--no-index","--no-deps",f"packages/{package}"])
@@ -261,6 +251,12 @@ def make_url(file_id, project, url_duration=2419200):
 @dxpy.entry_point('main')
 def main(url_duration, make_sessions, snv_path=None, cnv_path=None,bed_file=None):
 
+    # Set up logging
+    logger = logging.getLogger(__name__)
+    logger.addHandler(dxpy.DXLogHandler())
+    logger.propagate = False
+    logger.setLevel(logging.DEBUG)
+
     # Get the project ID
     DX_PROJECT = os.environ.get("DX_PROJECT_CONTEXT_ID")
     print(DX_PROJECT)
@@ -270,6 +266,7 @@ def main(url_duration, make_sessions, snv_path=None, cnv_path=None,bed_file=None
 
     # Gather required SNV files if SNV path is provided
     if snv_path is not None:
+        logger.info("Gathering Small variant files")
 
         snv_data = {}
 
@@ -291,12 +288,12 @@ def main(url_duration, make_sessions, snv_path=None, cnv_path=None,bed_file=None
 
     # Gather required CNV files if CNV path is provided
     if cnv_path is not None:
+        logger.info("Gathering CNV  files")
 
         cnv_data = {}
 
         for path in cnv_path.split(','):
-            print(path)
-            #logger.info("Gathering CNV report information")
+            print (f'Gathering reports from: {path}')
             cnv_reports = list(dxpy.bindings.search.find_data_objects(
                 name="*xlsx",
                 name_mode='glob',
@@ -327,7 +324,7 @@ def main(url_duration, make_sessions, snv_path=None, cnv_path=None,bed_file=None
     elif cnv_path:
         data = cnv_data
     else:
-        print ('No paths given, exiting...')
+        logger.debug("No paths given, exiting...")
         exit(1)
 
 
@@ -344,6 +341,7 @@ def main(url_duration, make_sessions, snv_path=None, cnv_path=None,bed_file=None
 
 
     # Write file
+    logger.info("Writing output file")
     with open(output_name, 'w') as f:
             f.write(f"Run:\t{DX_PROJECT_NAME}\n\n")
             f.write(f"Date Created:\t{str(datetime.datetime.now())}\n")
