@@ -38,6 +38,13 @@
       "help": ""
     },
     {
+      "name": "qc_status",
+      "label": "File containing sample qc status decision",
+      "class": "file",
+      "optional": true,
+      "help": ""
+    },
+    {
       "name": "make_sessions",
       "label": "Boolean option to create session files",
       "class": "boolean",

@@ -249,7 +249,7 @@ def make_url(file_id, project, url_duration=2419200):
 
 
 @dxpy.entry_point('main')
-def main(url_duration, make_sessions, snv_path=None, cnv_path=None,bed_file=None):
+def main(url_duration, make_sessions, snv_path=None, cnv_path=None,bed_file=None,qc_status=None):
 
     # Set up logging
     logger = logging.getLogger(__name__)
@@ -310,10 +310,18 @@ def main(url_duration, make_sessions, snv_path=None, cnv_path=None,bed_file=None
         # Get multiqc report
         multiqc = get_multiqc_report(cnv_path.split(',')[0],DX_PROJECT)
 
+    logger.info("Making URLs for additional files")
+    # If a bed file is provided, add to a link to the output
     if bed_file is not None:
         bed_file_url = make_url(bed_file, 'project-Fkb6Gkj433GVVvj73J7x8KbV')
     else:
         bed_file_url = 'No targets bed file provided'
+
+    # If a QC Status xlsx is provided, add to a link to the output
+    if qc_status is not None:
+        qc_status_url = make_url(qc_status, DX_PROJECT)
+    else:
+        qc_status_url = 'No qc_status bed file provided'
 
     data = {}
 
@@ -348,7 +356,7 @@ def main(url_duration, make_sessions, snv_path=None, cnv_path=None,bed_file=None
             f.write(f"Expiry Date:\t{str(expiry_date)}\n\n")
             f.write("Run level files\n")
             f.write(f"MultiQC report\t {make_url(multiqc,DX_PROJECT)}\n")
-            f.write(f"QC Status report\t/path/2/url/to/add\n\n")
+            f.write(f"QC Status report\t{qc_status_url}\n\n")
             f.write('Per Sample files\n\n')
 
             for sample,details in data.items():
