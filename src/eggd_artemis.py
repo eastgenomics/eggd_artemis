@@ -334,7 +334,7 @@ def main(url_duration, make_sessions, snv_path=None, cnv_path=None,bed_file=None
 
     # Write output file
     # Note2self - add version number to output file name??
-    today = datetime.datetime.now().strftime("%Y%m%d")
+    today = datetime.datetime.now().strftime("%y%m%d")
     output_name = f"{DX_PROJECT_NAME[4:]}_{today}.tsv"
 
     # Set timestamps
@@ -351,8 +351,8 @@ def main(url_duration, make_sessions, snv_path=None, cnv_path=None,bed_file=None
             f.write(f"Expiry Date:\t{str(expiry_date)}\n\n")
             f.write("Run level files\n")
             f.write(f"MultiQC report\t {make_url(multiqc,DX_PROJECT)}\n")
-            f.write(f"QC Status report\t/path/2/url/to/add\n")
-            f.write('Per Sample files\n')
+            f.write(f"QC Status report\t/path/2/url/to/add\n\n")
+            f.write('Per Sample files\n\n')
 
             for sample,details in data.items():
                 print(sample)
