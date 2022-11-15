@@ -149,7 +149,6 @@ def get_cnv_file_ids(reports,gcnv_dict):
 
     for report in reports:
         sample = report['describe']['name'].split("_")[0]
-        print(sample)
         gen_xlsx_job = report["describe"]["createdBy"]["job"]
 
         # Find the reports workflow analysis id
@@ -355,12 +354,11 @@ def main(url_duration, make_sessions, snv_path=None, cnv_path=None,bed_file=None
             f.write('Per Sample files\n\n')
 
             for sample,details in data.items():
-                print(sample)
-                print(details)
+
                 f.write(f"Sample ID:\t{sample}\n")
                 if snv_path is not None:
                     f.write(f"Coverage report:\t{make_url(details['Coverage report'],DX_PROJECT)}\n")
-                    f.write(f"SNV variant report:\t{make_url(details['SNV variant report'],DX_PROJECT)}\n")
+                    f.write(f"Small variant report:\t{make_url(details['SNV variant report'],DX_PROJECT)}\n")
 
                 if cnv_path is not None:
                     f.write(f"CNV variant report:\t{make_url(details['CNV variant report'],DX_PROJECT)}\n\n")
