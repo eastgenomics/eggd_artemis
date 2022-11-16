@@ -313,7 +313,7 @@ def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None
     if qc_status is not None:
         qc_status_url = make_url(qc_status, DX_PROJECT,url_duration)
     else:
-        qc_status_url = 'No qc_status bed file provided'
+        qc_status_url = 'No QC status file provided'
 
     data = {}
 
