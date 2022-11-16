@@ -1,0 +1,90 @@
+{
+  "name": "eggd_artemis",
+  "title": "eggd_artemis",
+  "summary": "Gathers required files and creates file containing urls for them",
+  "dxapi": "1.0.0",
+  "version": "1.0.0",
+  "properties": {
+    "githubRelease": "1.0.0"
+    },
+  "inputSpec": [
+    {
+      "name": "snv_path",
+      "label": "Path to SNV reports",
+      "class": "string",
+      "optional": true,
+      "help": ""
+    },
+    {
+      "name": "cnv_path",
+      "label": "Path to CNV reports",
+      "class": "string",
+      "optional": true,
+      "help": ""
+    },
+    {
+      "name": "url_duration",
+      "label": "Active url duration in seconds",
+      "class": "int",
+      "optional": true,
+      "default": 2419200,
+      "help": ""
+    },
+    {
+      "name": "bed_file",
+      "label": "Capture bed file",
+      "class": "file",
+      "optional": true,
+      "help": ""
+    },
+    {
+      "name": "qc_status",
+      "label": "File containing sample qc status decision",
+      "class": "file",
+      "optional": true,
+      "help": ""
+    }
+  ],
+  "outputSpec": [
+    {
+      "name": "url_file",
+      "label": "File contraining download links",
+      "class": "file",
+      "patterns": [
+        "*"
+      ],
+      "help": ""
+    }
+  ],
+  "runSpec": {
+    "timeoutPolicy": {
+      "*": {
+        "hours": 1
+      }
+    },
+    "interpreter": "python3",
+    "file": "src/eggd_artemis.py",
+    "distribution": "Ubuntu",
+    "release": "20.04",
+    "version": "0"
+  },
+  "developers":[
+    "org-emee_1"
+  ],
+  "authorizedUsers": [
+    "org-emee_1"
+  ],
+  "access": {
+    "project": "CONTRIBUTE",
+    "allProjects": "VIEW"
+  },
+  "regionalOptions": {
+    "aws:eu-central-1": {
+      "systemRequirements": {
+        "*": {
+          "instanceType": "mem1_ssd1_v2_x2"
+        }
+      }
+    }
+  }
+}
