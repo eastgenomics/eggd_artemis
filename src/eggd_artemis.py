@@ -5,7 +5,6 @@ import os
 import pip
 import dxpy
 import datetime
-import subprocess
 import logging
 
 
@@ -122,7 +121,7 @@ def get_cnv_file_ids(reports,gcnv_dict):
         gcnv_dict(dict): dictionary output of gcnv call i/o files
 
     Returns:
-        cnv_data (dict): Nested ictionary of files with sample name
+        cnv_data (dict): Nested dictionary of files with sample name
             as key and a list of files as values with key labels
     """
     cnv_data = {}
@@ -191,7 +190,6 @@ def get_multiqc_report(path_to_reports,project):
 
     # Find MultiQC jobs in the project
     multiqc_reports=list(dxpy.bindings.search.find_jobs(
-            #executable="eggd_MultiQC",
             name_mode='glob',
             name="*MultiQC*",
             state="done",
@@ -340,7 +338,9 @@ def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None
     now = datetime.datetime.now().strftime("%Y-%m-%d")
     expiry = datetime.timedelta(days=14)
 
-    expiry_date=(datetime.datetime.strptime(datetime.datetime.now().strftime('%Y-%m-%d'), '%Y-%m-%d') + datetime.timedelta(seconds=604800)).strftime('%Y-%m-%d')
+    expiry_date=(
+        datetime.datetime.strptime(datetime.datetime.now().strftime('%Y-%m-%d'),
+         '%Y-%m-%d') + datetime.timedelta(seconds=604800)).strftime('%Y-%m-%d')
 
 
     # Write file
