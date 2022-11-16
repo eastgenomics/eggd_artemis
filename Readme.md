@@ -7,11 +7,11 @@
 Gathers required files and creates file containing urls to allow file download within CUH & the LGLs.
 
 ## What inputs are required for this app to run?
-* `snv_path`: List of absolute paths to folder containing the variant reports for small variants
-* `cnv_path` : List of absolute paths to folder containing the variant reports for CNVs
-* `url_duration`: Time (in seconds) until the generated links expire
-* `bed_file`: Static capture bed file
-
+* `snv_path`[optional]: List of absolute paths to folder containing the variant reports for small variants
+* `cnv_path`[optional]: List of absolute paths to folder containing the variant reports for CNVs
+* `url_duration`[optional]: Time (in seconds) until the generated links expire. (Default = 1209600)
+* `bed_file`[optional]: Static capture bed file
+* `qc_status`[optional]: Input of xlsx file containing agreed QC status for samples in the run
 
 ## How does this app work?
 
@@ -36,6 +36,7 @@ Given a list of paths the app finds the appropriate files needed to share with t
 * `url file`: File contained URLs for the files described above
 
 ## Notes
-This app works specifically with the output of the dias pipeline, specifically expecting the path inputs to be in specific format to identify the MultiQC reports.
+* This app works specifically with the output of the dias pipeline, specifically expecting the path inputs to be in specific format to identify the MultiQC reports.
+* Please note although both paths are optional, if none are given the app will fail
 
 ## This app was created by East Genomics GLH
