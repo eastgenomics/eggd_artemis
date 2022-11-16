@@ -11,7 +11,7 @@ Gathers required files and creates file containing urls to allow file download w
 * `cnv_path` : List of absolute paths to folder containing the variant reports for CNVs
 * `url_duration`: Time (in seconds) until the generated links expire
 * `bed_file`: Static capture bed file
-* `make_sessions`: Boolean option to make session files (currently in development)
+
 
 ## How does this app work?
 
@@ -34,7 +34,6 @@ Given a list of paths the app finds the appropriate files needed to share with t
 
 ## What does this app output
 * `url file`: File contained URLs for the files described above
-* `session_files`: If True, IGV session files which consolidate all the files described.
 
 ## Notes
 
