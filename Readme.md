@@ -36,6 +36,6 @@ Given a list of paths the app finds the appropriate files needed to share with t
 * `url file`: File contained URLs for the files described above
 
 ## Notes
-
+This app works specifically with the output of the dias pipeline, specifically expecting the path inputs to be in specific format to identify the MultiQC reports.
 
 ## This app was created by East Genomics GLH
