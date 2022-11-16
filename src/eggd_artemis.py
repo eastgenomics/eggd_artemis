@@ -204,14 +204,13 @@ def get_multiqc_report(path_to_reports,project):
 
     return multiqc
 
-def make_url(file_id, project, url_duration=2419200):
+def make_url(file_id, project, url_duration):
         """ Given a file id create a download url
 
         Args:
             file_id (string/dict): dxpy file id or dnanexus file link
             project (string): id of project
             url_duration (int, optional): URL duration in seconds.
-                Defaults to 2419200.
 
         Returns:
             file_url (string): Download url of requested file
@@ -224,7 +223,7 @@ def make_url(file_id, project, url_duration=2419200):
         # Extract the file name to allow it to be used in the url
         file_name = dxpy.describe(file_id)["name"]
 
-        # Duration currently set for 7 days
+        # Duration currently defaults to 28 days unless provided as input
         file_url = file_info.get_download_url(
                 duration=url_duration, preauthenticated=True,
                 project=project, filename=file_name)[0]
@@ -306,13 +305,13 @@ def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None
     logger.info("Making URLs for additional files")
     # If a bed file is provided, add to a link to the output
     if bed_file is not None:
-        bed_file_url = make_url(bed_file, 'project-Fkb6Gkj433GVVvj73J7x8KbV')
+        bed_file_url = make_url(bed_file, 'project-Fkb6Gkj433GVVvj73J7x8KbV',url_duration)
     else:
         bed_file_url = 'No targets bed file provided'
 
     # If a QC Status xlsx is provided, add to a link to the output
     if qc_status is not None:
-        qc_status_url = make_url(qc_status, DX_PROJECT)
+        qc_status_url = make_url(qc_status, DX_PROJECT,url_duration)
     else:
         qc_status_url = 'No qc_status bed file provided'
 
@@ -336,11 +335,12 @@ def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None
 
     # Set timestamps
     now = datetime.datetime.now().strftime("%Y-%m-%d")
-    expiry = datetime.timedelta(days=14)
+    days2expiry = int(url_duration/86400)
+    expiry = datetime.timedelta(days=days2expiry)
 
     expiry_date=(
         datetime.datetime.strptime(datetime.datetime.now().strftime('%Y-%m-%d'),
-         '%Y-%m-%d') + datetime.timedelta(seconds=604800)).strftime('%Y-%m-%d')
+         '%Y-%m-%d') + datetime.timedelta(seconds=url_duration)).strftime('%Y-%m-%d')
 
 
     # Write file
@@ -351,7 +351,7 @@ def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None
             f.write(f"Date Created:\t{str(datetime.datetime.now())}\n")
             f.write(f"Expiry Date:\t{str(expiry_date)}\n\n")
             f.write("Run level files\n")
-            f.write(f"MultiQC report\t{make_url(multiqc,DX_PROJECT)}\n")
+            f.write(f"MultiQC report\t{make_url(multiqc,DX_PROJECT,url_duration)}\n")
             f.write(f"QC Status report\t{qc_status_url}\n\n")
             f.write('Per Sample files\n\n')
 
@@ -361,19 +361,19 @@ def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None
                 f.write(f"\nSample ID:\t{sample}\n")
 
                 if "SNV variant report" in details:
-                    f.write(f"Coverage report:\t{make_url(details['Coverage report'],DX_PROJECT)}\n")
-                    f.write(f"Small variant report:\t{make_url(details['SNV variant report'],DX_PROJECT)}\n")
+                    f.write(f"Coverage report:\t{make_url(details['Coverage report'],DX_PROJECT,url_duration)}\n")
+                    f.write(f"Small variant report:\t{make_url(details['SNV variant report'],DX_PROJECT,url_duration)}\n")
 
                 if 'CNV variant report' in details:
-                    f.write(f"CNV variant report:\t{make_url(details['CNV variant report'],DX_PROJECT)}\n\n")
+                    f.write(f"CNV variant report:\t{make_url(details['CNV variant report'],DX_PROJECT,url_duration)}\n\n")
 
-                f.write(f"Alignment BAM:\t{make_url(details['Alignment BAM'],DX_PROJECT)}\n")
-                f.write(f"Alignment BAI:\t{make_url(details['Alignment BAI'],DX_PROJECT)}\n")
+                f.write(f"Alignment BAM:\t{make_url(details['Alignment BAM'],DX_PROJECT,url_duration)}\n")
+                f.write(f"Alignment BAI:\t{make_url(details['Alignment BAI'],DX_PROJECT,url_duration)}\n")
 
                 if 'CNV variant report' in details:
-                    f.write(f"CNV visualisation:\t{make_url(details['CNV visualisation'],DX_PROJECT)}\n")
-                    f.write(f"CNV calls for IGV:\t{make_url(details['CNV calls for IGV'],DX_PROJECT)}\n\n")
-                    f.write(f"CNV excluded regions\t{make_url(excluded_intervals,DX_PROJECT)}\n")
+                    f.write(f"CNV visualisation:\t{make_url(details['CNV visualisation'],DX_PROJECT,url_duration)}\n")
+                    f.write(f"CNV calls for IGV:\t{make_url(details['CNV calls for IGV'],DX_PROJECT,url_duration)}\n\n")
+                    f.write(f"CNV excluded regions\t{make_url(excluded_intervals,DX_PROJECT,url_duration)}\n")
                     f.write(f"CNV targets\t{bed_file_url}\n\n")
 
     # Upload output to the platform
