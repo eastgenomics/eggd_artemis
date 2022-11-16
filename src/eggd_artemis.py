@@ -134,12 +134,14 @@ def get_cnv_file_ids(reports,gcnv_dict):
         # Find the reports workflow analysis id
         reports_analysis = dxpy.bindings.dxjob.DXJob(
             dxid=gen_xlsx_job).describe()["parentAnalysis"]
-        # Get the CNV report
+        # Get the CNV report and seg file using the analysis id
         cnv_workbook_id = dxpy.bindings.dxanalysis.DXAnalysis(
             dxid=reports_analysis).describe()["output"]["stage-GFfYY9j4qq8ZxpFpP8zKG7G0.xlsx_report"]
         seg_id = dxpy.bindings.dxanalysis.DXAnalysis(
             dxid=reports_analysis).describe()["output"]["stage-GG2z5yQ4qq8vb2xp4pB8XByz.seg_file"]
 
+        # gCNV job has all input bams and all outputs go through info
+        # saved in the dictionary and find the sample specific files required
         for k,v in gcnv_dict.items():
             if k.startswith(f'{sample}-'):
                 if k.endswith(".bam"):
@@ -229,9 +231,13 @@ def make_url(file_id, project, url_duration=2419200):
                 duration=url_duration, preauthenticated=True,
                 project=project, filename=file_name)[0]
 
+        # Without unsetting and clearing the workstation environment
+        # the output urls have the local hostname which doesn't work
+        # Find hostname
         workstation_hostname = file_url.split('/')[2]
         dx_hostname = 'dl.ec1.dnanex.us'
 
+        # Replace with eu specific hostname and update protocol
         file_url = file_url.replace(workstation_hostname,dx_hostname)
         file_url = file_url.replace('http','https')
 
@@ -239,7 +245,7 @@ def make_url(file_id, project, url_duration=2419200):
 
 
 @dxpy.entry_point('main')
-def main(url_duration, make_sessions, snv_path=None, cnv_path=None,bed_file=None,qc_status=None):
+def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None):
 
     # Set up logging
     logger = logging.getLogger(__name__)
@@ -261,7 +267,6 @@ def main(url_duration, make_sessions, snv_path=None, cnv_path=None,bed_file=None
         snv_data = {}
 
         for path in snv_path.split(','):
-        #logger.info("Gathering SNV report information")
             print (f'Gathering reports from: {path}')
             snv_reports = list(dxpy.bindings.search.find_data_objects(
                 name="*xlsx",
@@ -341,6 +346,7 @@ def main(url_duration, make_sessions, snv_path=None, cnv_path=None,bed_file=None
     # Write file
     logger.info("Writing output file")
     with open(output_name, 'w') as f:
+            # Write run specific details at top of file
             f.write(f"Run:\t{DX_PROJECT_NAME}\n\n")
             f.write(f"Date Created:\t{str(datetime.datetime.now())}\n")
             f.write(f"Expiry Date:\t{str(expiry_date)}\n\n")
@@ -349,6 +355,7 @@ def main(url_duration, make_sessions, snv_path=None, cnv_path=None,bed_file=None
             f.write(f"QC Status report\t{qc_status_url}\n\n")
             f.write('Per Sample files\n\n')
 
+            # For each sample, write out the available sample URLs
             for sample,details in data.items():
 
                 f.write(f"\nSample ID:\t{sample}\n")
@@ -372,7 +379,6 @@ def main(url_duration, make_sessions, snv_path=None, cnv_path=None,bed_file=None
     output = {}
     url_file = dxpy.upload_local_file(output_name)
     output["url_file"] = dxpy.dxlink(url_file)
-    #output["session_files"] = [dxpy.dxlink(item) for item in session_files]
 
     return output
 
