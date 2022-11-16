@@ -359,17 +359,18 @@ def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None
             for sample,details in data.items():
 
                 f.write(f"\nSample ID:\t{sample}\n")
-                if snv_path is not None:
+
+                if "SNV variant report" in details:
                     f.write(f"Coverage report:\t{make_url(details['Coverage report'],DX_PROJECT)}\n")
                     f.write(f"Small variant report:\t{make_url(details['SNV variant report'],DX_PROJECT)}\n")
 
-                if cnv_path is not None:
+                if 'CNV variant report' in details:
                     f.write(f"CNV variant report:\t{make_url(details['CNV variant report'],DX_PROJECT)}\n\n")
 
                 f.write(f"Alignment BAM:\t{make_url(details['Alignment BAM'],DX_PROJECT)}\n")
                 f.write(f"Alignment BAI:\t{make_url(details['Alignment BAI'],DX_PROJECT)}\n")
 
-                if cnv_path is not None:
+                if 'CNV variant report' in details:
                     f.write(f"CNV visualisation:\t{make_url(details['CNV visualisation'],DX_PROJECT)}\n")
                     f.write(f"CNV calls for IGV:\t{make_url(details['CNV calls for IGV'],DX_PROJECT)}\n\n")
                     f.write(f"CNV excluded regions\t{make_url(excluded_intervals,DX_PROJECT)}\n")
