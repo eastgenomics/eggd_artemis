@@ -43,6 +43,14 @@
       "class": "file",
       "optional": true,
       "help": ""
+    },
+    {
+      "name": "make_sessions",
+      "label": "Boolean option to create session files",
+      "class": "boolean",
+      "optional": true,
+      "default": false,
+      "help": ""
     }
   ],
   "outputSpec": [
@@ -50,6 +58,16 @@
       "name": "url_file",
       "label": "File contraining download links",
       "class": "file",
+      "patterns": [
+        "*"
+      ],
+      "help": ""
+    },
+    {
+      "name": "session_files",
+      "label": "array:file",
+      "class": "array:file",
+      "optional": true,
       "patterns": [
         "*"
       ],
