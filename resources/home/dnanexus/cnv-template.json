@@ -1,0 +1,89 @@
+{
+	"version": "2.13.3",
+	"showSampleNames": false,
+	"reference": {
+		"id": "hg19",
+		"name": "Human (GRCh37/hg19)",
+		"fastaURL": "https://s3.amazonaws.com/igv.broadinstitute.org/genomes/seq/hg19/hg19.fasta",
+		"indexURL": "https://s3.amazonaws.com/igv.broadinstitute.org/genomes/seq/hg19/hg19.fasta.fai",
+		"cytobandURL": "https://s3.amazonaws.com/igv.broadinstitute.org/genomes/seq/hg19/cytoBand.txt",
+		"aliasURL": "https://s3.amazonaws.com/igv.org.genomes/hg19/hg19_alias.tab",
+		"chromosomeOrder": "chr1, chr2, chr3, chr4, chr5, chr6, chr7, chr8, chr9, chr10, chr11, chr12, chr13, chr14, chr15, chr16, chr17, chr18, chr19, chr20, chr21, chr22, chrX, chrY"
+	},
+	"locus": "",
+	"roi": [],
+	"tracks": [
+		{
+			"type": "sequence",
+			"order": -9007199254740991
+		},
+		{
+			"url": "",
+			"name": "CNV-bed",
+			"indexURL": "",
+			"derivedName": true,
+			"format": "gcnv",
+			"type": "gcnv",
+			"height": 200,
+			"highlightSamples": {
+				"mean": "blue",
+				"mean_plus_std": "#0B2559",
+				"mean_minus_std": "#0B2559",
+				"mean_plus_std2": "#36BFB1",
+				"mean_minus_std2": "#36BFB1"
+			},
+			"order": 6
+		},
+		{
+			"url": "",
+			"name": "",
+			"indexURL": "",
+			"derivedName": true,
+			"format": "bam",
+			"type": "alignment",
+			"height": 300,
+			"alleleFreqThreshold": 0.2,
+			"order": 7
+		},
+		{
+			"url": "",
+			"name": "variant-bed",
+			"derivedName": true,
+			"format": "seg",
+			"type": "seg",
+			"height": 50,
+			"order": 8
+		},
+		{
+			"url": "",
+			"name": "excluded-regions",
+			"derivedName": true,
+			"format": "bed",
+			"type": "annotation",
+			"height": 50,
+			"order": 9
+		},
+		{
+			"url": "",
+			"name": "capture-targets",
+			"derivedName": true,
+			"format": "bed",
+			"type": "annotation",
+			"height": 50,
+			"order": 10
+		},
+		{
+			"name": "Refseq Genes",
+			"format": "refgene",
+			"id": "hg19_genes",
+			"url": "https://s3.amazonaws.com/igv.org.genomes/hg19/ncbiRefSeq.sorted.txt.gz",
+			"indexURL": "https://s3.amazonaws.com/igv.org.genomes/hg19/ncbiRefSeq.sorted.txt.gz.tbi",
+			"visibilityWindow": -1,
+			"supportsWholeGenome": false,
+			"removable": false,
+			"order": 1000000,
+			"infoURL": "https://www.ncbi.nlm.nih.gov/gene/?term=$$",
+			"type": "annotation"
+		}
+	]
+}

@@ -3,9 +3,9 @@
   "title": "eggd_artemis",
   "summary": "Gathers required files and creates file containing urls for them",
   "dxapi": "1.0.0",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "properties": {
-    "githubRelease": "1.0.0"
+    "githubRelease": "1.1.0"
     },
   "inputSpec": [
     {
@@ -42,14 +42,6 @@
       "label": "File containing sample qc status decision",
       "class": "file",
       "optional": true,
-      "help": ""
-    },
-    {
-      "name": "make_sessions",
-      "label": "Boolean option to create session files",
-      "class": "boolean",
-      "optional": true,
-      "default": false,
       "help": ""
     }
   ],

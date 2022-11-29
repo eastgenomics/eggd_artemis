@@ -4,9 +4,10 @@
 import os
 import pip
 import dxpy
+import json
 import datetime
 import logging
-
+from copy import deepcopy
 
 # Install merge dict package
 for package in os.listdir("/home/dnanexus/packages"):
@@ -221,7 +222,7 @@ def make_url(file_id, project, url_duration):
                 dxid=file_id, project=project)
 
         # Extract the file name to allow it to be used in the url
-        file_name = dxpy.describe(file_id)["name"]
+        file_name = file_info.describe()["name"]
 
         # Duration currently defaults to 28 days unless provided as input
         file_url = file_info.get_download_url(
@@ -240,6 +241,150 @@ def make_url(file_id, project, url_duration):
 
         return file_url
 
+def set_order_map(snv_only=False):
+
+    if snv_only == True:
+
+        order_map = {
+            '6': {
+                'url': '',
+                'indexURL': ''
+            },
+            '7': {
+                'url': '',
+                'name': 'vcf'
+            }
+        }
+
+    else:
+
+        order_map = {
+            '6': {
+                'url': '',
+                'name': 'CNV-bed'
+            },
+            '7': {
+                'url': '',
+                'indexURL': ''
+            },
+            '8': {
+                'url': '',
+                'name': 'variant-bed'
+            },
+            '9': {
+                'url': '',
+                'name': 'excluded-regions'
+            },
+            '10': {
+                'url': '',
+                'name': 'CNV-targets-bed'
+            }
+
+        }
+    return order_map
+
+def make_cnv_session(
+    sessions_list,sample,bam_url,bai_url,bed_url,
+    seg_url,excluded_url,targets_url,DX_PROJECT,expiry_date):
+    """ Create a session file for IGV
+
+    Args:
+        bam_url (string): URL of the bam file
+        bai_url (string): URL of the bai file
+        bed_url (string): URL of the bed file
+        seg_url (string): URL of the seg file
+        excluded_url (string): URL of the excluded regions file
+        targets_url (string): URL of the targets file
+
+    Returns:
+        session_file (string): IGV session file URL
+    """
+    order_map = set_order_map()
+
+    # Copy template to avoid overwriting
+    with open('/home/dnanexus/cnv-template.json') as fh:
+        template = json.load(fh)
+
+    template_copy = deepcopy(template)
+
+    template_copy['tracks'] = []
+
+    # Order 6 - Visualisation bed for CNV calls
+    order_map['6']['url'] = bed_url
+
+    # Order 7 - Patient bam and index
+    order_map['7']['name'] = sample
+    order_map['7']['url'] = bam_url
+    order_map['7']['indexURL'] = bai_url
+
+    # Order 8 - Variant seg file
+    order_map['8']['url'] = seg_url
+
+    # Order 9 - Excluded regions from CNV calling bed
+    order_map['9']['url'] = excluded_url
+
+    # Order 10 - Target regions bed
+    order_map['10']['url'] = targets_url
+
+    # Map urls to template
+    for track in template['tracks']:
+        if track['order'] in [6, 7, 8, 9, 10]:
+            order = str(track['order'])
+            track['url'] = order_map[order]['url']
+
+        if track['order'] == 7:
+            track['indexURL'] = order_map[order]['indexURL']
+        if track['order'] == 6:
+            track['highlightSamples'][sample] = "red"
+
+        template_copy['tracks'].append(track)
+
+
+    output_name = sample + "_igv.json"
+
+    with open(output_name, "w") as outfile:
+        json.dump(template_copy, outfile, indent=4)
+
+    # Get current job id
+    DX_JOB_ID = os.environ.get("DX_JOB_ID")
+
+    # Get output folder set for this job
+    job_output = dxpy.bindings.dxjob.DXJob(DX_JOB_ID).describe()['folder']
+    if job_output == '/':
+        output_folder = '/igv_sessions'
+    else:
+        output_folder = f'{job_output}/igv_sessions'
+
+    # Set the environment context to allow upload
+    dxpy.set_workspace_id(DX_PROJECT)
+
+    # Create folder if it doesn't exist
+    dxpy.api.project_new_folder(
+        DX_PROJECT,
+        input_params={
+            "folder": output_folder,
+            "parents": True})
+
+    #session_file = dxpy.upload_local_file('file2upload.txt', folder=output_folder, tags=['tag'])
+    session_file = dxpy.upload_local_file(
+        output_name,
+        folder=output_folder,
+        tags=[expiry_date],
+        keep_open=True)
+
+    sessions_list.append(session_file)
+
+    session_file_id = list(dxpy.bindings.search.find_data_objects(
+        project=DX_PROJECT,
+        name=output_name,
+        name_mode='exact'))[0]
+
+    session_info = dxpy.bindings.dxfile.DXFile(
+                dxid=session_file_id['id'], project=DX_PROJECT)
+
+    session_info.close(block=True)
+
+    return session_file_id['id'],sessions_list
 
 @dxpy.entry_point('main')
 def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None):
@@ -298,6 +443,8 @@ def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None
 
             # Get excluded intervals file
             excluded_intervals = get_excluded_intervals(gcnv_job_info)
+            ex_intervals_url = make_url(excluded_intervals,DX_PROJECT,url_duration)
+
             merge(cnv_data,cnv_files)
         # Get multiqc report
         multiqc = get_multiqc_report(cnv_path.split(',')[0],DX_PROJECT)
@@ -307,7 +454,8 @@ def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None
     if bed_file is not None:
         bed_file_url = make_url(bed_file, 'project-Fkb6Gkj433GVVvj73J7x8KbV',url_duration)
     else:
-        bed_file_url = 'No targets bed file provided'
+        # Setting as empty to avoid session errors
+        bed_file_url = ''
 
     # If a QC Status xlsx is provided, add to a link to the output
     if qc_status is not None:
@@ -319,10 +467,13 @@ def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None
 
     if snv_path and cnv_path:
         merge(data, snv_data, cnv_data)
+        session_files = []
+
     elif snv_path:
         data = snv_data
     elif cnv_path:
         data = cnv_data
+        session_files = []
     else:
         logger.debug("No paths given, exiting...")
         exit(1)
@@ -367,19 +518,34 @@ def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None
                 if 'CNV variant report' in details:
                     f.write(f"CNV variant report:\t{make_url(details['CNV variant report'],DX_PROJECT,url_duration)}\n\n")
 
-                f.write(f"Alignment BAM:\t{make_url(details['Alignment BAM'],DX_PROJECT,url_duration)}\n")
-                f.write(f"Alignment BAI:\t{make_url(details['Alignment BAI'],DX_PROJECT,url_duration)}\n")
+                bam = make_url(details['Alignment BAM'],DX_PROJECT,url_duration)
+                bai = make_url(details['Alignment BAI'],DX_PROJECT,url_duration)
 
                 if 'CNV variant report' in details:
-                    f.write(f"CNV visualisation:\t{make_url(details['CNV visualisation'],DX_PROJECT,url_duration)}\n")
-                    f.write(f"CNV calls for IGV:\t{make_url(details['CNV calls for IGV'],DX_PROJECT,url_duration)}\n\n")
-                    f.write(f"CNV excluded regions\t{make_url(excluded_intervals,DX_PROJECT,url_duration)}\n")
-                    f.write(f"CNV targets\t{bed_file_url}\n\n")
+
+                    cnv_bed = make_url(details['CNV visualisation'],DX_PROJECT,url_duration)
+                    cnv_seg = make_url(details['CNV calls for IGV'],DX_PROJECT,url_duration)
+
+                    cnv_session, session_files = make_cnv_session(
+                        session_files, sample, bam, bai, cnv_bed, cnv_seg,
+                        ex_intervals_url, bed_file_url, DX_PROJECT, expiry_date)
+
+                    cnv_session_url=make_url(cnv_session,DX_PROJECT,url_duration)
+
+                    f.write(f"CNV IGV Session:\t{cnv_session_url}\n\n")
+
+                elif "SNV variant report" in details:
+                    f.write(f"Alignment BAM:\t{bam}\n")
+                    f.write(f"Alignment BAI:\t{bai}\n")
 
     # Upload output to the platform
     output = {}
     url_file = dxpy.upload_local_file(output_name)
     output["url_file"] = dxpy.dxlink(url_file)
+
+    if session_files != []:
+        output["session_files"] = [dxpy.dxlink(item) for item in session_files]
+
 
     return output
 
