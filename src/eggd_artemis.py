@@ -385,7 +385,7 @@ def make_cnv_session(
     session_file_id = session_file.get_id()
 
     session_info = dxpy.bindings.dxfile.DXFile(
-                dxid=ssession_file_id, project=DX_PROJECT)
+                dxid=session_file_id, project=DX_PROJECT)
 
     print(session_info.describe()['name'])
 
