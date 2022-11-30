@@ -19,19 +19,12 @@
 		},
 		{
 			"url": "",
-			"name": "CNV-bed",
+			"name": "Sample compared to run",
 			"indexURL": "",
 			"derivedName": true,
 			"format": "gcnv",
 			"type": "gcnv",
 			"height": 200,
-			"highlightSamples": {
-				"mean": "blue",
-				"mean_plus_std": "#0B2559",
-				"mean_minus_std": "#0B2559",
-				"mean_plus_std2": "#36BFB1",
-				"mean_minus_std2": "#36BFB1"
-			},
 			"order": 6
 		},
 		{
@@ -41,13 +34,13 @@
 			"derivedName": true,
 			"format": "bam",
 			"type": "alignment",
-			"height": 300,
+			"height": 350,
 			"alleleFreqThreshold": 0.2,
 			"order": 7
 		},
 		{
 			"url": "",
-			"name": "variant-bed",
+			"name": "CNV calls",
 			"derivedName": true,
 			"format": "seg",
 			"type": "seg",
@@ -56,7 +49,7 @@
 		},
 		{
 			"url": "",
-			"name": "excluded-regions",
+			"name": "Excluded regions",
 			"derivedName": true,
 			"format": "bed",
 			"type": "annotation",
@@ -65,7 +58,7 @@
 		},
 		{
 			"url": "",
-			"name": "capture-targets",
+			"name": "Capture targets",
 			"derivedName": true,
 			"format": "bed",
 			"type": "annotation",

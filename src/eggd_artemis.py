@@ -334,8 +334,8 @@ def make_cnv_session(
 
         if track['order'] == 7:
             track['indexURL'] = order_map[order]['indexURL']
-        if track['order'] == 6:
-            track['highlightSamples'][sample] = "red"
+        #if track['order'] == 6:
+            #track['highlightSamples'][sample] = "red"
 
         template_copy['tracks'].append(track)
 
@@ -365,12 +365,11 @@ def make_cnv_session(
             "folder": output_folder,
             "parents": True})
 
-    #session_file = dxpy.upload_local_file('file2upload.txt', folder=output_folder, tags=['tag'])
     session_file = dxpy.upload_local_file(
         output_name,
         folder=output_folder,
         tags=[expiry_date],
-        keep_open=True)
+        wait_on_close=True)
 
     sessions_list.append(session_file)
 
@@ -382,9 +381,11 @@ def make_cnv_session(
     session_info = dxpy.bindings.dxfile.DXFile(
                 dxid=session_file_id['id'], project=DX_PROJECT)
 
-    session_info.close(block=True)
+    #session_info.close(block=True)
+    print(session_info.describe()['name'])
 
     return session_file_id['id'],sessions_list
+
 
 @dxpy.entry_point('main')
 def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None):
