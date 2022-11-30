@@ -248,7 +248,7 @@ def set_order_map(snv_only=False):
         snv_only (bool, optional): If True, returns snv order map
 
     Returns:
-        order_mapt (dict): order of inputs to the session template
+        order_map (dict): order of inputs to the session template
     """
 
     if snv_only == True:
@@ -289,6 +289,7 @@ def set_order_map(snv_only=False):
             }
 
         }
+
     return order_map
 
 def make_cnv_session(
@@ -347,13 +348,11 @@ def make_cnv_session(
 
         if track['order'] == 7:
             track['indexURL'] = order_map[order]['indexURL']
-        #if track['order'] == 6:
-            #track['highlightSamples'][sample] = "red"
 
         template_copy['tracks'].append(track)
 
 
-    output_name = sample + "_igv.json"
+    output_name = f"{sample}_igv.json"
 
     with open(output_name, "w") as outfile:
         json.dump(template_copy, outfile, indent=4)
@@ -363,10 +362,7 @@ def make_cnv_session(
 
     # Get output folder set for this job
     job_output = dxpy.bindings.dxjob.DXJob(DX_JOB_ID).describe()['folder']
-    if job_output == '/':
-        output_folder = '/igv_sessions'
-    else:
-        output_folder = f'{job_output}/igv_sessions'
+    output_folder = f'{job_output}/igv_sessions'
 
     # Set the environment context to allow upload
     dxpy.set_workspace_id(DX_PROJECT)
@@ -383,21 +379,17 @@ def make_cnv_session(
         folder=output_folder,
         tags=[expiry_date],
         wait_on_close=True)
-
+    print()
     sessions_list.append(session_file)
 
-    session_file_id = list(dxpy.bindings.search.find_data_objects(
-        project=DX_PROJECT,
-        name=output_name,
-        name_mode='exact'))[0]
+    session_file_id = session_file.get_id()
 
     session_info = dxpy.bindings.dxfile.DXFile(
-                dxid=session_file_id['id'], project=DX_PROJECT)
+                dxid=ssession_file_id, project=DX_PROJECT)
 
-    #session_info.close(block=True)
     print(session_info.describe()['name'])
 
-    return session_file_id['id'],sessions_list
+    return session_file_id, sessions_list
 
 
 @dxpy.entry_point('main')
@@ -457,7 +449,7 @@ def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None
 
             # Get excluded intervals file
             excluded_intervals = get_excluded_intervals(gcnv_job_info)
-            ex_intervals_url = make_url(excluded_intervals,DX_PROJECT,url_duration)
+            ex_intervals_url = make_url(excluded_intervals, DX_PROJECT, url_duration)
 
             merge(cnv_data,cnv_files)
         # Get multiqc report
@@ -465,14 +457,14 @@ def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None
 
     logger.info("Making URLs for additional files")
     # If a bed file is provided, add to a link to the output
-    if bed_file is not None:
+    if bed_file:
         bed_file_url = make_url(bed_file, 'project-Fkb6Gkj433GVVvj73J7x8KbV',url_duration)
     else:
         # Setting as empty to avoid session errors
         bed_file_url = ''
 
     # If a QC Status xlsx is provided, add to a link to the output
-    if qc_status is not None:
+    if qc_status:
         qc_status_url = make_url(qc_status, DX_PROJECT,url_duration)
     else:
         qc_status_url = 'No QC status file provided'
@@ -516,7 +508,7 @@ def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None
             f.write(f"Date Created:\t{str(datetime.datetime.now().strftime('%Y-%m-%d'))}\n")
             f.write(f"Expiry Date:\t{str(expiry_date)}\n\n")
             f.write("Run level files\n")
-            f.write(f"MultiQC report\t{make_url(multiqc,DX_PROJECT,url_duration)}\n")
+            f.write(f"MultiQC report\t{make_url(multiqc, DX_PROJECT, url_duration)}\n")
             f.write(f"QC Status report\t{qc_status_url}\n\n")
             f.write('Per Sample files\n\n')
 
@@ -526,25 +518,25 @@ def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None
                 f.write(f"\nSample ID:\t{sample}\n")
 
                 if "SNV variant report" in details:
-                    f.write(f"Coverage report:\t{make_url(details['Coverage report'],DX_PROJECT,url_duration)}\n")
-                    f.write(f"Small variant report:\t{make_url(details['SNV variant report'],DX_PROJECT,url_duration)}\n")
+                    f.write(f"Coverage report:\t{make_url(details['Coverage report'], DX_PROJECT, url_duration)}\n")
+                    f.write(f"Small variant report:\t{make_url(details['SNV variant report'], DX_PROJECT, url_duration)}\n")
 
                 if 'CNV variant report' in details:
-                    f.write(f"CNV variant report:\t{make_url(details['CNV variant report'],DX_PROJECT,url_duration)}\n\n")
+                    f.write(f"CNV variant report:\t{make_url(details['CNV variant report'], DX_PROJECT, url_duration)}\n\n")
 
-                bam = make_url(details['Alignment BAM'],DX_PROJECT,url_duration)
-                bai = make_url(details['Alignment BAI'],DX_PROJECT,url_duration)
+                bam = make_url(details['Alignment BAM'], DX_PROJECT, url_duration)
+                bai = make_url(details['Alignment BAI'] ,DX_PROJECT, url_duration)
 
                 if 'CNV variant report' in details:
 
-                    cnv_bed = make_url(details['CNV visualisation'],DX_PROJECT,url_duration)
-                    cnv_seg = make_url(details['CNV calls for IGV'],DX_PROJECT,url_duration)
+                    cnv_bed = make_url(details['CNV visualisation'], DX_PROJECT, url_duration)
+                    cnv_seg = make_url(details['CNV calls for IGV'], DX_PROJECT, url_duration)
 
                     cnv_session, session_files = make_cnv_session(
                         session_files, sample, bam, bai, cnv_bed, cnv_seg,
                         ex_intervals_url, bed_file_url, DX_PROJECT, expiry_date)
 
-                    cnv_session_url=make_url(cnv_session,DX_PROJECT,url_duration)
+                    cnv_session_url=make_url(cnv_session, DX_PROJECT, url_duration)
 
                     f.write(f"CNV IGV Session:\t{cnv_session_url}\n\n")
 
