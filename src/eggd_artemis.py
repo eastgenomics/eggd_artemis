@@ -242,6 +242,14 @@ def make_url(file_id, project, url_duration):
         return file_url
 
 def set_order_map(snv_only=False):
+    """ Set the order of the session depending on input
+
+    Args:
+        snv_only (bool, optional): If True, returns snv order map
+
+    Returns:
+        order_mapt (dict): order of inputs to the session template
+    """
 
     if snv_only == True:
 
