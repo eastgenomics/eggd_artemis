@@ -3,9 +3,9 @@
   "title": "eggd_artemis",
   "summary": "Gathers required files and creates file containing urls for them",
   "dxapi": "1.0.0",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "properties": {
-    "githubRelease": "1.0.0"
+    "githubRelease": "1.1.0"
     },
   "inputSpec": [
     {
@@ -50,6 +50,16 @@
       "name": "url_file",
       "label": "File contraining download links",
       "class": "file",
+      "patterns": [
+        "*"
+      ],
+      "help": ""
+    },
+    {
+      "name": "session_files",
+      "label": "array:file",
+      "class": "array:file",
+      "optional": true,
       "patterns": [
         "*"
       ],
