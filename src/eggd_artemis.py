@@ -379,15 +379,11 @@ def make_cnv_session(
         folder=output_folder,
         tags=[expiry_date],
         wait_on_close=True)
-    print()
+
+    # Append session file to output list
     sessions_list.append(session_file)
 
     session_file_id = session_file.get_id()
-
-    session_info = dxpy.bindings.dxfile.DXFile(
-                dxid=session_file_id, project=DX_PROJECT)
-
-    print(session_info.describe()['name'])
 
     return session_file_id, sessions_list
 
