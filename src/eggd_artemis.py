@@ -500,7 +500,7 @@ def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None
     with open(output_name, 'w') as f:
             # Write run specific details at top of file
             f.write(f"Run:\t{DX_PROJECT_NAME}\n\n")
-            f.write(f"Date Created:\t{str(datetime.datetime.now())}\n")
+            f.write(f"Date Created:\t{str(datetime.datetime.now().strftime('%Y-%m-%d'))}\n")
             f.write(f"Expiry Date:\t{str(expiry_date)}\n\n")
             f.write("Run level files\n")
             f.write(f"MultiQC report\t{make_url(multiqc,DX_PROJECT,url_duration)}\n")
@@ -541,7 +541,7 @@ def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None
 
     # Upload output to the platform
     output = {}
-    url_file = dxpy.upload_local_file(output_name)
+    url_file = dxpy.upload_local_file(output_name,tags=[expiry_date])
     output["url_file"] = dxpy.dxlink(url_file)
 
     if session_files != []:
