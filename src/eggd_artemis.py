@@ -284,20 +284,25 @@ def set_order_map(snv_only=False):
     return order_map
 
 def make_cnv_session(
-    sessions_list,sample,bam_url,bai_url,bed_url,
-    seg_url,excluded_url,targets_url,DX_PROJECT,expiry_date):
+    sessions_list, sample, bam_url, bai_url, bed_url,
+    seg_url, excluded_url, targets_url, DX_PROJECT, expiry_date):
     """ Create a session file for IGV
 
     Args:
+        sessions_list (list): list of session files to upload in the end
+        sample (string): sample name
         bam_url (string): URL of the bam file
         bai_url (string): URL of the bai file
         bed_url (string): URL of the bed file
         seg_url (string): URL of the seg file
         excluded_url (string): URL of the excluded regions file
         targets_url (string): URL of the targets file
+        DX_PROJECT (string): id of project
+        expiry_date (string): date of expiry of file created
 
     Returns:
         session_file (string): IGV session file URL
+        sessions_list (list): input list with current session appended
     """
     order_map = set_order_map()
 
