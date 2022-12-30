@@ -546,6 +546,7 @@ def write_output_file(
     xlsx file
     """
     print("Writing output file")
+
     multiqc_url = f'=HYPERLINK("{multiqc_url}", "{multiqc_url}")'
     if qc_url.startswith('http'):
         qc_url = f'=HYPERLINK("{qc_url}", "{qc_url}")'
@@ -599,7 +600,7 @@ def write_output_file(
     # set column widths
     sheet = writer.sheets['Sheet1']
     sheet.column_dimensions['A'].width = 20
-    sheet.column_dimensions['B'].width = 100
+    sheet.column_dimensions['B'].width = 145
 
     sheet['A1'].font = Font(bold=True, name=DEFAULT_FONT.name)
     sheet['A6'].font = Font(bold=True, name=DEFAULT_FONT.name)
@@ -693,6 +694,8 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
         # Get multiqc report
         if not multiqc:
             multiqc = get_multiqc_report(cnv_path.split(',')[0], DX_PROJECT)
+    else:
+        ex_intervals_url = ''
 
     logger.info("Making URLs for additional files")
 
@@ -769,6 +772,7 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
         x.get('cnv_session_fileid') for x in all_sample_urls.values()
         if x.get('cnv_session_fileid')
     ]
+    print(f"Found {len(session_files)} session files to link to job output")
     if session_files:
         output["session_files"] = [dxpy.dxlink(item) for item in session_files]
 
