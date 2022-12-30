@@ -1,20 +1,23 @@
 #!/usr/bin/env python
 # eggd_artemis
-
+import concurrent
 import os
 import pip
+import re
 import dxpy
 import json
 import datetime
 import logging
 from copy import deepcopy
 
-# Install merge dict package
+# Install required packages
 for package in os.listdir("/home/dnanexus/packages"):
     print(f"Installing {package}")
-    pip.main(["install","--no-index","--no-deps",f"packages/{package}"])
+    pip.main(["install", "--no-index", "--no-deps", f"packages/{package}"])
 
 from mergedeep import merge
+from openpyxl.styles import DEFAULT_FONT, Font
+import pandas as pd
 
 
 def find_snv_files(reports):
@@ -27,10 +30,16 @@ def find_snv_files(reports):
         snv_data (dict): Nested dictionary of files with sample name
             as key and a list of files as values with key labels
     """
-    snv_data = {}
+    def _find(report):
+        """
+        Find files for single sample
 
-    for report in reports:
+        Args:
+            report (dict): dx describe return for single sample
 
+        Returns:
+            data (dict): files found for sample
+        """
         # Get sample name
         sample = report['describe']['name'].split("_")[0]
 
@@ -41,31 +50,47 @@ def find_snv_files(reports):
         parent_analysis = dxpy.bindings.dxjob.DXJob(
             dxid=job_id).describe()["parentAnalysis"]
 
-        # Get the vcf file id
-        vcf_file = dxpy.bindings.dxanalysis.DXAnalysis(
-            dxid=parent_analysis).describe()["input"]["stage-G9Q0jzQ4vyJ3x37X4KBKXZ5v.vcf"]
-
-        # Get the athena coverage file id
-        coverage_report = dxpy.bindings.dxanalysis.DXAnalysis(
-            dxid=parent_analysis).describe()["output"]["stage-Fyq5z18433GfYZbp3vX1KqjB.report"]
+        # Get the vcf file id and athena coverage file id
+        parent_details = dxpy.bindings.dxanalysis.DXAnalysis(
+            dxid=parent_analysis).describe()
+        vcf_file = parent_details["input"]["stage-G9Q0jzQ4vyJ3x37X4KBKXZ5v.vcf"]
+        coverage_report = parent_details["output"]["stage-Fyq5z18433GfYZbp3vX1KqjB.report"]
 
         # Extract the sention job id from the vcf metadata
         sention_job_id=dxpy.describe(vcf_file)["createdBy"]["job"]
+        sentieon_details = dxpy.bindings.dxjob.DXJob(dxid=sention_job_id).describe()
 
         # Get bam & bai job id from sention job metadata
-        mappings_bam = dxpy.bindings.dxjob.DXJob(
-            dxid=sention_job_id).describe()["output"]["mappings_bam"]
-
-        mappings_bai = dxpy.bindings.dxjob.DXJob(
-            dxid=sention_job_id).describe()["output"]["mappings_bam_bai"]
+        mappings_bam = sentieon_details["output"]["mappings_bam"]
+        mappings_bai = sentieon_details["output"]["mappings_bam_bai"]
 
         # Store in dictionary to return
-        snv_data[sample] = {
+        data = {
+            "sample": sample,
             "SNV variant report": report['describe']['id'],
             "Coverage report": coverage_report,
             'Alignment BAM': mappings_bam,
             'Alignment BAI': mappings_bai
         }
+
+        return data
+
+    snv_data = {}
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
+        # submit jobs mapping each id to describe call
+        concurrent_jobs = {
+            executor.submit(_find, report) for report in reports
+        }
+
+        for future in concurrent.futures.as_completed(concurrent_jobs):
+            # access returned output as each is returned in any order
+            try:
+                data = future.result()
+                snv_data[data['sample']] = data
+            except Exception as exc:
+                # catch any errors that might get raised during querying
+                print(f"Error getting data for {concurrent_jobs[future]}: {exc}")
 
     return snv_data
 
@@ -95,26 +120,37 @@ def get_cnv_call_details(reports):
     cnv_call_job = dxpy.describe(vcf_id)["createdBy"]["job"]
 
     # Store all file ids and names in a dictionary
-    calling_files={}
+    calling_files = {}
 
     # Find the output files of the cnv call job
-    gcnv_output=(dxpy.bindings.dxjob.DXJob(dxid=cnv_call_job).describe()["output"]["result_files"])
-    gcnv_input=(dxpy.bindings.dxjob.DXJob(dxid=cnv_call_job).describe()["input"]["bambais"])
+    cnv_details = dxpy.bindings.dxjob.DXJob(dxid=cnv_call_job).describe()
+    gcnv_output = cnv_details["output"]["result_files"]
+    gcnv_input = cnv_details["input"]["bambais"]
 
-    # Store the input files in the dictionary with sample name as key
-    # and file-id as value
-    for file in gcnv_output:
-        file_details = dxpy.describe(file,fields={"name":True,"id":True})
-        calling_files[file_details['name']] = file_details['id']
+    # get and store name and file ID of all input and output files
+    with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
+        # submit jobs mapping each id to describe call
+        concurrent_jobs = {
+            executor.submit(
+                dxpy.describe, file, fields={"name": True, "id": True}
+            ) for file in gcnv_input + gcnv_output
+        }
 
-    # Store the output files in the dictionary
-    for file in gcnv_input:
-        file_details = dxpy.describe(file,fields={"name":True,"id":True})
-        calling_files[file_details['name']] = file_details['id']
+        for future in concurrent.futures.as_completed(concurrent_jobs):
+            # access returned output as each is returned in any order
+            try:
+                data = future.result()
+                calling_files[data['name']] = data['id']
+            except Exception as exc:
+                # catch any errors that might get raised during querying
+                print(f"Error getting data for {concurrent_jobs[future]}: {exc}")
+
+    print(f"Found {len(calling_files.keys())} gCNV input / output files")
 
     return calling_files
 
-def get_cnv_file_ids(reports,gcnv_dict):
+
+def get_cnv_file_ids(reports, gcnv_dict):
     """ Gather all related file ids for cnv files
 
     Args:
@@ -125,24 +161,32 @@ def get_cnv_file_ids(reports,gcnv_dict):
         cnv_data (dict): Nested dictionary of files with sample name
             as key and a list of files as values with key labels
     """
-    cnv_data = {}
+    def _find(report):
+        """
+        Find files for single sample
 
-    for report in reports:
+        Args:
+            report (dict): dx describe return for single sample
+
+        Returns:
+            data (dict): files found for sample
+        """
         sample = report['describe']['name'].split("_")[0]
         gen_xlsx_job = report["describe"]["createdBy"]["job"]
 
         # Find the reports workflow analysis id
         reports_analysis = dxpy.bindings.dxjob.DXJob(
             dxid=gen_xlsx_job).describe()["parentAnalysis"]
+        reports_details = dxpy.bindings.dxanalysis.DXAnalysis(
+            dxid=reports_analysis).describe()
+
         # Get the CNV report and seg file using the analysis id
-        cnv_workbook_id = dxpy.bindings.dxanalysis.DXAnalysis(
-            dxid=reports_analysis).describe()["output"]["stage-GFfYY9j4qq8ZxpFpP8zKG7G0.xlsx_report"]
-        seg_id = dxpy.bindings.dxanalysis.DXAnalysis(
-            dxid=reports_analysis).describe()["output"]["stage-GG2z5yQ4qq8vb2xp4pB8XByz.seg_file"]
+        cnv_workbook_id = reports_details["output"]["stage-GFfYY9j4qq8ZxpFpP8zKG7G0.xlsx_report"]
+        seg_id = reports_details["output"]["stage-GG2z5yQ4qq8vb2xp4pB8XByz.seg_file"]
 
         # gCNV job has all input bams and all outputs go through info
         # saved in the dictionary and find the sample specific files required
-        for k,v in gcnv_dict.items():
+        for k, v in gcnv_dict.items():
             if k.startswith(f'{sample}-'):
                 if k.endswith(".bam"):
                     bam = v
@@ -151,7 +195,8 @@ def get_cnv_file_ids(reports,gcnv_dict):
                 elif k.endswith(".bed.gz"):
                     gcnv_bed = v
 
-        cnv_data[sample] = {
+        data = {
+            'sample': sample,
             'Alignment BAM': bam,
             'Alignment BAI': bai,
             'CNV variant report': cnv_workbook_id,
@@ -159,8 +204,27 @@ def get_cnv_file_ids(reports,gcnv_dict):
             'CNV calls for IGV': seg_id
         }
 
+        return data
+
+    cnv_data = {}
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
+        # submit jobs mapping each id to describe call
+        concurrent_jobs = {
+            executor.submit(_find, report) for report in reports
+        }
+
+        for future in concurrent.futures.as_completed(concurrent_jobs):
+            # access returned output as each is returned in any order
+            try:
+                data = future.result()
+                cnv_data[data['sample']] = data
+            except Exception as exc:
+                # catch any errors that might get raised during querying
+                print(f"Error getting data for {concurrent_jobs[future]}: {exc}")
 
     return cnv_data
+
 
 def get_excluded_intervals(gcnv_output_dict):
     """ Get the excluded regions file from the gcnv dictionary
@@ -171,13 +235,13 @@ def get_excluded_intervals(gcnv_output_dict):
     Returns:
         excluded_file (str): file id of the excluded regions file
     """
-    for k,v in gcnv_output_dict.items():
+    for k, v in gcnv_output_dict.items():
         if k.endswith("excluded_intervals.bed"):
-            excluded_file = v
+            return v
+    return None
 
-    return excluded_file
 
-def get_multiqc_report(path_to_reports,project):
+def get_multiqc_report(path_to_reports, project):
     """ Find appropriate multiqc file
 
     Args:
@@ -205,41 +269,41 @@ def get_multiqc_report(path_to_reports,project):
 
     return multiqc
 
+
 def make_url(file_id, project, url_duration):
-        """ Given a file id create a download url
+    """ Given a file id create a download url
 
-        Args:
-            file_id (string/dict): dxpy file id or dnanexus file link
-            project (string): id of project
-            url_duration (int, optional): URL duration in seconds.
+    Args:
+        file_id (string/dict): dxpy file id or dnanexus file link
+        project (string): id of project
+        url_duration (int, optional): URL duration in seconds.
 
-        Returns:
-            file_url (string): Download url of requested file
-        """
+    Returns:
+        file_url (string): Download url of requested file
+    """
+    # Bind dxpy file object to pass to make_download_url command
+    file_info = dxpy.bindings.dxfile.DXFile(dxid=file_id, project=project)
 
-        # Bind dxpy file object to pass to make_download_url command
-        file_info = dxpy.bindings.dxfile.DXFile(
-                dxid=file_id, project=project)
+    # Extract the file name to allow it to be used in the url
+    file_name = file_info.describe()["name"]
 
-        # Extract the file name to allow it to be used in the url
-        file_name = file_info.describe()["name"]
+    # Duration currently defaults to 28 days unless provided as input
+    file_url = file_info.get_download_url(
+            duration=url_duration, preauthenticated=True,
+            filename=file_name, project=project)[0]
 
-        # Duration currently defaults to 28 days unless provided as input
-        file_url = file_info.get_download_url(
-                duration=url_duration, preauthenticated=True,
-                project=project, filename=file_name)[0]
+    # Without unsetting and clearing the workstation environment
+    # the output urls have the local hostname which doesn't work
+    # Find hostname
+    workstation_hostname = file_url.split('/')[2]
+    dx_hostname = 'dl.ec1.dnanex.us'
 
-        # Without unsetting and clearing the workstation environment
-        # the output urls have the local hostname which doesn't work
-        # Find hostname
-        workstation_hostname = file_url.split('/')[2]
-        dx_hostname = 'dl.ec1.dnanex.us'
+    # Replace with eu specific hostname and update protocol
+    file_url = file_url.replace(workstation_hostname, dx_hostname)
+    file_url = file_url.replace('http', 'https')
 
-        # Replace with eu specific hostname and update protocol
-        file_url = file_url.replace(workstation_hostname,dx_hostname)
-        file_url = file_url.replace('http','https')
+    return file_url
 
-        return file_url
 
 def set_order_map(snv_only=False):
     """ Set the order of the session depending on input
@@ -292,8 +356,9 @@ def set_order_map(snv_only=False):
 
     return order_map
 
+
 def make_cnv_session(
-    sessions_list, sample, bam_url, bai_url, bed_url,
+    sample, bam_url, bai_url, bed_url,
     seg_url, excluded_url, targets_url, DX_PROJECT, expiry_date):
     """ Create a session file for IGV
 
@@ -311,7 +376,6 @@ def make_cnv_session(
 
     Returns:
         session_file (string): IGV session file URL
-        sessions_list (list): input list with current session appended
     """
     order_map = set_order_map()
 
@@ -380,16 +444,186 @@ def make_cnv_session(
         tags=[expiry_date],
         wait_on_close=True)
 
-    # Append session file to output list
-    sessions_list.append(session_file)
-
     session_file_id = session_file.get_id()
 
-    return session_file_id, sessions_list
+    return session_file_id
+
+
+def generate_sample_urls(
+    sample, sample_data, url_duration, ex_intervals_url,
+    bed_url, expiry_date) -> dict:
+    """
+    Generates all URLs and session file for a given sample
+
+    Parameters
+    ----------
+    sample : str
+        sample name
+    sample_data : dict
+        file IDs of sample related files
+    url_duration : int
+        URL duration in seconds
+    ex_intervals_url : str
+        URL of excluded intervals file
+    bed_url : str
+        URL of bed file
+    expiry_date : str
+        date of URL expiration
+
+    Returns
+    -------
+    dict
+        dict of sample URLs
+    """
+    dx_project = os.environ.get("DX_PROJECT_CONTEXT_ID")
+
+    urls = {}
+    urls['sample'] = sample
+
+    bam_url = make_url(sample_data['Alignment BAM'], dx_project, url_duration)
+    bai_url = make_url(sample_data['Alignment BAI'], dx_project, url_duration)
+
+    urls['bam_url'] = bam_url
+    urls['bai_url'] = bai_url
+
+    if "SNV variant report" in sample_data:
+        coverage_url = make_url(
+            sample_data['Coverage report'], dx_project, url_duration)
+        snv_url = make_url(
+            sample_data['SNV variant report'], dx_project, url_duration)
+
+        urls['coverage_url'] = (
+            f'=HYPERLINK("{coverage_url}", "{coverage_url}")'
+        )
+        urls['snv_url'] = f'=HYPERLINK("{snv_url}", "{snv_url}")'
+
+    if 'CNV variant report' in sample_data:
+        cnv_url = make_url(
+            sample_data['CNV variant report'], dx_project, url_duration)
+
+        cnv_bed = make_url(
+            sample_data['CNV visualisation'], dx_project, url_duration)
+        cnv_seg = make_url(
+            sample_data['CNV calls for IGV'], dx_project, url_duration)
+
+        cnv_session = make_cnv_session(
+            sample, bam_url, bai_url, cnv_bed, cnv_seg, ex_intervals_url,
+            bed_url, dx_project, expiry_date)
+
+        cnv_session_url = make_url(cnv_session, dx_project, url_duration)
+
+        urls['cnv_bed'] = cnv_bed
+        urls['cnv_seg'] = cnv_seg
+        urls['cnv_session_fileid'] = cnv_session
+        urls['cnv_url'] = f'=HYPERLINK("{cnv_url}", "{cnv_url}")'
+        urls['cnv_session_url'] = (
+            f'=HYPERLINK("{cnv_session_url}", "{cnv_session_url}")'
+        )
+
+    return urls
+
+
+def write_output_file(
+    sample_urls, today, expiry_date, multiqc_url, qc_url, project_name):
+    """
+    Writes output xlsx file with all download URLs
+
+    Parameters
+    ----------
+    sample_urls : dict
+        generated URLs for each sample
+    today : str
+        today date
+    expiry_date : str
+        date of URL experation
+    multiqc_url : str
+        download URL for multiQC report
+    qc_url : str
+        download URL for QC report
+
+    Outputs
+    -------
+    xlsx file
+    """
+    print("Writing output file")
+    multiqc_url = f'=HYPERLINK("{multiqc_url}", "{multiqc_url}")'
+    if qc_url.startswith('http'):
+        qc_url = f'=HYPERLINK("{qc_url}", "{qc_url}")'
+
+    df = pd.DataFrame(columns=['a', 'b'])
+    df = df.append({'a': 'Run:', 'b': project_name}, ignore_index=True)
+    df = df.append({}, ignore_index=True)
+    df = df.append({'a': 'Date Crated:', 'b': today}, ignore_index=True)
+    df = df.append({'a': 'Expiry Date:', 'b': expiry_date}, ignore_index=True)
+    df = df.append({}, ignore_index=True)
+    df = df.append({'a': 'Run Level Files'}, ignore_index=True)
+    df = df.append({'a': 'MultiQC report', 'b': multiqc_url}, ignore_index=True)
+    df = df.append({'a': 'QC Status Report', 'b': qc_url}, ignore_index=True)
+    df = df.append({}, ignore_index=True)
+    df = df.append({}, ignore_index=True)
+    df = df.append({'a': 'Per Sample Files'}, ignore_index=True)
+    df = df.append({}, ignore_index=True)
+
+    sample_order = sorted(sample_urls.keys())
+
+    for sample in sample_order:
+        urls = sample_urls.get(sample)
+
+        df = df.append({'a': sample}, ignore_index=True)
+
+        url_fields = {
+            'coverage_url': 'Coverage report:',
+            'snv_url': 'Small variant report',
+            'cnv_url': 'CNV variant report',
+            'cnv_session_url': 'CNV IGV Session:',
+            'bam_url': 'Alignment BAM',
+            'bai_url': 'Alignment BAI'
+        }
+
+        for field, label in url_fields.items():
+            if urls.get(field):
+                if field == 'bam_url':
+                    df = df.append({}, ignore_index=True)
+
+                df = df.append(
+                    {'a': label, 'b': urls.get(field)}, ignore_index=True
+                )
+
+        df = df.append({}, ignore_index=True)
+        df = df.append({}, ignore_index=True)
+
+
+    writer = pd.ExcelWriter(f'{project_name}_{today}.xlsx', engine='openpyxl')
+    df.to_excel(writer, index=False, header=False)
+
+    # set column widths
+    sheet = writer.sheets['Sheet1']
+    sheet.column_dimensions['A'].width = 20
+    sheet.column_dimensions['B'].width = 100
+
+    sheet['A1'].font = Font(bold=True, name=DEFAULT_FONT.name)
+    sheet['A6'].font = Font(bold=True, name=DEFAULT_FONT.name)
+    sheet['A11'].font = Font(bold=True, name=DEFAULT_FONT.name)
+
+    # make sample IDs bold
+    for cell in sheet.iter_rows(max_col=1):
+        if re.match(r'X[\d]+', cell[0].value):
+            sheet[cell[0].coordinate].font = Font(
+                bold=True, name=DEFAULT_FONT.name)
+
+    # make hyperlinks blue
+    for cell in sheet.iter_rows(min_col=2, max_col=2):
+        if 'HYPERLINK' in str(cell[0].value):
+            sheet[cell[0].coordinate].font = Font(
+                color='00007f', name=DEFAULT_FONT.name)
+
+    writer.book.save(f'{project_name}_{today}.xlsx')
+
+    print(f"Output written to {project_name}_{today}.xlsx")
 
 
 @dxpy.entry_point('main')
-def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None):
+def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=None):
 
     # Set up logging
     logger = logging.getLogger(__name__)
@@ -402,16 +636,17 @@ def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None
     print(DX_PROJECT)
 
     # Get name of project for output naming
-    DX_PROJECT_NAME = dxpy.describe(DX_PROJECT)['name']
+    project_name = dxpy.describe(DX_PROJECT)['name']
+    project_name = '_'.join(project_name.split('_')[1:-1])
 
     # Gather required SNV files if SNV path is provided
-    if snv_path is not None:
+    if snv_path:
         logger.info("Gathering Small variant files")
 
         snv_data = {}
 
         for path in snv_path.split(','):
-            print (f'Gathering reports from: {path}')
+            print(f'Gathering reports from: {path}')
             snv_reports = list(dxpy.bindings.search.find_data_objects(
                 name="*xlsx",
                 name_mode='glob',
@@ -421,18 +656,21 @@ def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None
 
             # Get SNV ids
             snv_files = find_snv_files(snv_reports)
-            merge (snv_data,snv_files)
+            merge(snv_data, snv_files)
+
+        print(f"Size of snv data dict: {len(snv_data.keys())}")
+
         # Get multiqc report
-        multiqc = get_multiqc_report(snv_path.split(',')[0],DX_PROJECT)
+        multiqc = get_multiqc_report(snv_path.split(',')[0], DX_PROJECT)
 
     # Gather required CNV files if CNV path is provided
-    if cnv_path is not None:
+    if cnv_path:
         logger.info("Gathering CNV  files")
 
         cnv_data = {}
 
         for path in cnv_path.split(','):
-            print (f'Gathering reports from: {path}')
+            print(f'Gathering reports from: {path}')
             cnv_reports = list(dxpy.bindings.search.find_data_objects(
                 name="*xlsx",
                 name_mode='glob',
@@ -441,27 +679,34 @@ def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None
                 describe=True))
 
             gcnv_job_info = get_cnv_call_details(cnv_reports)
-            cnv_files = get_cnv_file_ids(cnv_reports,gcnv_job_info)
+            cnv_files = get_cnv_file_ids(cnv_reports, gcnv_job_info)
 
             # Get excluded intervals file
             excluded_intervals = get_excluded_intervals(gcnv_job_info)
-            ex_intervals_url = make_url(excluded_intervals, DX_PROJECT, url_duration)
+            ex_intervals_url = make_url(
+                excluded_intervals, DX_PROJECT, url_duration)
 
-            merge(cnv_data,cnv_files)
+            merge(cnv_data, cnv_files)
+
+        print(f"Size of cnv data dict: {len(cnv_data.keys())}")
+
         # Get multiqc report
-        multiqc = get_multiqc_report(cnv_path.split(',')[0],DX_PROJECT)
+        if not multiqc:
+            multiqc = get_multiqc_report(cnv_path.split(',')[0], DX_PROJECT)
 
     logger.info("Making URLs for additional files")
+
     # If a bed file is provided, add to a link to the output
     if bed_file:
-        bed_file_url = make_url(bed_file, 'project-Fkb6Gkj433GVVvj73J7x8KbV',url_duration)
+        bed_file_url = make_url(
+            bed_file, 'project-Fkb6Gkj433GVVvj73J7x8KbV', url_duration)
     else:
         # Setting as empty to avoid session errors
         bed_file_url = ''
 
     # If a QC Status xlsx is provided, add to a link to the output
     if qc_status:
-        qc_status_url = make_url(qc_status, DX_PROJECT,url_duration)
+        qc_status_url = make_url(qc_status, DX_PROJECT, url_duration)
     else:
         qc_status_url = 'No QC status file provided'
 
@@ -469,83 +714,62 @@ def main(url_duration, snv_path=None, cnv_path=None,bed_file=None,qc_status=None
 
     if snv_path and cnv_path:
         merge(data, snv_data, cnv_data)
-        session_files = []
-
     elif snv_path:
         data = snv_data
     elif cnv_path:
         data = cnv_data
-        session_files = []
     else:
         logger.debug("No paths given, exiting...")
         exit(1)
 
 
-    # Write output file
-    # Note2self - add version number to output file name??
-    today = datetime.datetime.now().strftime("%y%m%d")
-    output_name = f"{DX_PROJECT_NAME[4:]}_{today}.tsv"
-
-    # Set timestamps
-    now = datetime.datetime.now().strftime("%Y-%m-%d")
-    days2expiry = int(url_duration/86400)
-    expiry = datetime.timedelta(days=days2expiry)
-
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
     expiry_date=(
         datetime.datetime.strptime(datetime.datetime.now().strftime('%Y-%m-%d'),
-         '%Y-%m-%d') + datetime.timedelta(seconds=url_duration)).strftime('%Y-%m-%d')
+        '%Y-%m-%d') + datetime.timedelta(seconds=url_duration)
+    ).strftime('%Y-%m-%d')
 
 
-    # Write file
-    logger.info("Writing output file")
-    with open(output_name, 'w') as f:
-            # Write run specific details at top of file
-            f.write(f"Run:\t{DX_PROJECT_NAME}\n\n")
-            f.write(f"Date Created:\t{str(datetime.datetime.now().strftime('%Y-%m-%d'))}\n")
-            f.write(f"Expiry Date:\t{str(expiry_date)}\n\n")
-            f.write("Run level files\n")
-            f.write(f"MultiQC report\t{make_url(multiqc, DX_PROJECT, url_duration)}\n")
-            f.write(f"QC Status report\t{qc_status_url}\n\n")
-            f.write('Per Sample files\n\n')
+    # generate all urls for each sample
+    logger.info("Generating per sample URLs")
+    all_sample_urls = {}
 
-            # For each sample, write out the available sample URLs
-            for sample,details in data.items():
+    with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
+        # submit jobs mapping each id to describe call
+        concurrent_jobs = {
+            executor.submit(
+                generate_sample_urls, sample, sample_data, url_duration,
+                ex_intervals_url, bed_file_url, expiry_date
+            ) for sample, sample_data in data.items()
+        }
 
-                f.write(f"\nSample ID:\t{sample}\n")
+        for future in concurrent.futures.as_completed(concurrent_jobs):
+            # access returned output as each is returned in any order
+            try:
+                data = future.result()
+                all_sample_urls[data['sample']] = data
+            except Exception as exc:
+                # catch any errors that might get raised during querying
+                print(f"Error getting data for {concurrent_jobs[future]}: {exc}")
 
-                if "SNV variant report" in details:
-                    f.write(f"Coverage report:\t{make_url(details['Coverage report'], DX_PROJECT, url_duration)}\n")
-                    f.write(f"Small variant report:\t{make_url(details['SNV variant report'], DX_PROJECT, url_duration)}\n")
+    multiqc_url = make_url(multiqc, DX_PROJECT, url_duration)
 
-                if 'CNV variant report' in details:
-                    f.write(f"CNV variant report:\t{make_url(details['CNV variant report'], DX_PROJECT, url_duration)}\n\n")
-
-                bam = make_url(details['Alignment BAM'], DX_PROJECT, url_duration)
-                bai = make_url(details['Alignment BAI'] ,DX_PROJECT, url_duration)
-
-                if 'CNV variant report' in details:
-
-                    cnv_bed = make_url(details['CNV visualisation'], DX_PROJECT, url_duration)
-                    cnv_seg = make_url(details['CNV calls for IGV'], DX_PROJECT, url_duration)
-
-                    cnv_session, session_files = make_cnv_session(
-                        session_files, sample, bam, bai, cnv_bed, cnv_seg,
-                        ex_intervals_url, bed_file_url, DX_PROJECT, expiry_date)
-
-                    cnv_session_url=make_url(cnv_session, DX_PROJECT, url_duration)
-
-                    f.write(f"CNV IGV Session:\t{cnv_session_url}\n\n")
-
-                elif "SNV variant report" in details:
-                    f.write(f"Alignment BAM:\t{bam}\n")
-                    f.write(f"Alignment BAI:\t{bai}\n")
+    write_output_file(
+        all_sample_urls, today, expiry_date, multiqc_url,
+        qc_status_url, project_name
+    )
 
     # Upload output to the platform
     output = {}
-    url_file = dxpy.upload_local_file(output_name,tags=[expiry_date])
+    url_file = dxpy.upload_local_file(
+        f'{project_name}_{today}.xlsx', tags=[expiry_date])
     output["url_file"] = dxpy.dxlink(url_file)
 
-    if session_files != []:
+    session_files = [
+        x.get('cnv_session_fileid') for x in all_sample_urls.values()
+        if x.get('cnv_session_fileid')
+    ]
+    if session_files:
         output["session_files"] = [dxpy.dxlink(item) for item in session_files]
 
 
