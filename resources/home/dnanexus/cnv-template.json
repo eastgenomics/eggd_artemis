@@ -54,7 +54,8 @@
 			"format": "bed",
 			"type": "annotation",
 			"height": 50,
-			"order": 9
+			"order": 9,
+            "color": "red"
 		},
 		{
 			"url": "",
