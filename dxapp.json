@@ -24,10 +24,10 @@
     },
     {
       "name": "url_duration",
-      "label": "Active url duration in seconds",
+      "label": "Active url duration in seconds (default: 8 weeks)",
       "class": "int",
       "optional": true,
-      "default": 2419200,
+      "default": 4838400,
       "help": ""
     },
     {
