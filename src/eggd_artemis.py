@@ -628,6 +628,13 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
     job_output = dxpy.bindings.dxjob.DXJob(
         os.environ.get('DX_JOB_ID')).describe()['folder']
 
+    # Make output folder for job
+    dxpy.api.project_new_folder(
+        DX_PROJECT,
+        input_params={
+            "folder": job_output,
+            "parents": True})
+
     # Get name of project for output naming
     project_name = dxpy.describe(DX_PROJECT)['name']
     project_name = '_'.join(project_name.split('_')[1:-1])
