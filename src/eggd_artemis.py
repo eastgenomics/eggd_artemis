@@ -641,6 +641,7 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
     project_name = '_'.join(project_name.split('_')[1:-1])
 
     # Gather required SNV files if SNV path is provided
+    multiqc = None
     if snv_path:
         logger.info("Gathering Small variant files")
 
