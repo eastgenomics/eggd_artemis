@@ -359,7 +359,7 @@ def set_order_map(snv_only=False):
 
 def make_cnv_session(
     sample, bam_url, bai_url, bed_url,
-    seg_url, excluded_url, targets_url, DX_PROJECT, expiry_date):
+    seg_url, excluded_url, targets_url, job_output, expiry_date):
     """ Create a session file for IGV
 
     Args:
@@ -371,7 +371,7 @@ def make_cnv_session(
         seg_url (string): URL of the seg file
         excluded_url (string): URL of the excluded regions file
         targets_url (string): URL of the targets file
-        DX_PROJECT (string): id of project
+        job_output (str) : output folder set for job
         expiry_date (string): date of expiry of file created
 
     Returns:
@@ -421,26 +421,9 @@ def make_cnv_session(
     with open(output_name, "w") as outfile:
         json.dump(template_copy, outfile, indent=4)
 
-    # Get current job id
-    DX_JOB_ID = os.environ.get("DX_JOB_ID")
-
-    # Get output folder set for this job
-    job_output = dxpy.bindings.dxjob.DXJob(DX_JOB_ID).describe()['folder']
-    output_folder = f'{job_output}/igv_sessions'
-
-    # Set the environment context to allow upload
-    dxpy.set_workspace_id(DX_PROJECT)
-
-    # Create folder if it doesn't exist
-    dxpy.api.project_new_folder(
-        DX_PROJECT,
-        input_params={
-            "folder": output_folder,
-            "parents": True})
-
     session_file = dxpy.upload_local_file(
         output_name,
-        folder=output_folder,
+        folder=f'{job_output}/igv_sessions',
         tags=[expiry_date],
         wait_on_close=True)
 
@@ -451,7 +434,7 @@ def make_cnv_session(
 
 def generate_sample_urls(
     sample, sample_data, url_duration, ex_intervals_url,
-    bed_url, expiry_date) -> dict:
+    bed_url, expiry_date, job_output) -> dict:
     """
     Generates all URLs and session file for a given sample
 
@@ -469,6 +452,8 @@ def generate_sample_urls(
         URL of bed file
     expiry_date : str
         date of URL expiration
+    job_output : str
+        output folder set for job
 
     Returns
     -------
@@ -508,7 +493,7 @@ def generate_sample_urls(
 
         cnv_session = make_cnv_session(
             sample, bam_url, bai_url, cnv_bed, cnv_seg, ex_intervals_url,
-            bed_url, dx_project, expiry_date)
+            bed_url, job_output, expiry_date)
 
         cnv_session_url = make_url(cnv_session, dx_project, url_duration)
 
@@ -636,6 +621,20 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
     DX_PROJECT = os.environ.get("DX_PROJECT_CONTEXT_ID")
     print(DX_PROJECT)
 
+    # Set the environment context to allow upload
+    dxpy.set_workspace_id(DX_PROJECT)
+
+    # Get output folder set for this job
+    job_output = dxpy.bindings.dxjob.DXJob(
+        os.environ.get('DX_JOB_ID')).describe()['folder']
+
+    # Make output folder for job
+    dxpy.api.project_new_folder(
+        DX_PROJECT,
+        input_params={
+            "folder": job_output,
+            "parents": True})
+
     # Get name of project for output naming
     project_name = dxpy.describe(DX_PROJECT)['name']
     project_name = '_'.join(project_name.split('_')[1:-1])
@@ -668,6 +667,13 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
     # Gather required CNV files if CNV path is provided
     if cnv_path:
         logger.info("Gathering CNV  files")
+
+        # Create folder for session files
+        dxpy.api.project_new_folder(
+            DX_PROJECT,
+            input_params={
+                "folder": f"{job_output}/igv_sessions",
+                "parents": True})
 
         cnv_data = {}
 
@@ -743,7 +749,7 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
         concurrent_jobs = {
             executor.submit(
                 generate_sample_urls, sample, sample_data, url_duration,
-                ex_intervals_url, bed_file_url, expiry_date
+                ex_intervals_url, bed_file_url, expiry_date, job_output
             ) for sample, sample_data in data.items()
         }
 
@@ -766,7 +772,10 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
     # Upload output to the platform
     output = {}
     url_file = dxpy.upload_local_file(
-        f'{project_name}_{today}.xlsx', tags=[expiry_date])
+        f'{project_name}_{today}.xlsx',
+        folder=job_output,
+        tags=[expiry_date]
+    )
     output["url_file"] = dxpy.dxlink(url_file)
 
     session_files = [
