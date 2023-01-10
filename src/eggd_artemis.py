@@ -625,7 +625,8 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
     dxpy.set_workspace_id(DX_PROJECT)
 
     # Get output folder set for this job
-    job_output = dxpy.bindings.dxjob.DXJob(DX_PROJECT).describe()['folder']
+    job_output = dxpy.bindings.dxjob.DXJob(
+        os.environ.get('DX_JOB_ID')).describe()['folder']
 
     # Get name of project for output naming
     project_name = dxpy.describe(DX_PROJECT)['name']
