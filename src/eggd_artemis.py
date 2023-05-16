@@ -539,7 +539,7 @@ def write_output_file(
     df = pd.DataFrame(columns=['a', 'b'])
     df = df.append({'a': 'Run:', 'b': project_name}, ignore_index=True)
     df = df.append({}, ignore_index=True)
-    df = df.append({'a': 'Date Crated:', 'b': today}, ignore_index=True)
+    df = df.append({'a': 'Date Created:', 'b': today}, ignore_index=True)
     df = df.append({'a': 'Expiry Date:', 'b': expiry_date}, ignore_index=True)
     df = df.append({}, ignore_index=True)
     df = df.append({'a': 'Run Level Files'}, ignore_index=True)
