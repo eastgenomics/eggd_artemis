@@ -187,7 +187,7 @@ def get_cnv_file_ids(reports, gcnv_dict):
         # gCNV job has all input bams and all outputs go through info
         # saved in the dictionary and find the sample specific files required
         for k, v in gcnv_dict.items():
-            if k.startswith(f'{sample}-'):
+            if k.startswith(f'{sample}'):
                 if k.endswith(".bam"):
                     bam = v
                 elif k.endswith(".bai"):
