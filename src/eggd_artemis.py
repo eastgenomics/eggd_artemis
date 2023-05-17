@@ -187,7 +187,7 @@ def get_cnv_file_ids(reports, gcnv_dict):
         # gCNV job has all input bams and all outputs go through info
         # saved in the dictionary and find the sample specific files required
         for k, v in gcnv_dict.items():
-            if k.startswith(f'{sample}-'):
+            if k.startswith(f'{sample}'):
                 if k.endswith(".bam"):
                     bam = v
                 elif k.endswith(".bai"):
@@ -539,7 +539,7 @@ def write_output_file(
     df = pd.DataFrame(columns=['a', 'b'])
     df = df.append({'a': 'Run:', 'b': project_name}, ignore_index=True)
     df = df.append({}, ignore_index=True)
-    df = df.append({'a': 'Date Crated:', 'b': today}, ignore_index=True)
+    df = df.append({'a': 'Date Created:', 'b': today}, ignore_index=True)
     df = df.append({'a': 'Expiry Date:', 'b': expiry_date}, ignore_index=True)
     df = df.append({}, ignore_index=True)
     df = df.append({'a': 'Run Level Files'}, ignore_index=True)
