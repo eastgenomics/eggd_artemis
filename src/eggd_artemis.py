@@ -53,8 +53,22 @@ def find_snv_files(reports):
         # Get the vcf file id and athena coverage file id
         parent_details = dxpy.bindings.dxanalysis.DXAnalysis(
             dxid=parent_analysis).describe()
-        vcf_file = parent_details["input"]["stage-G9Q0jzQ4vyJ3x37X4KBKXZ5v.vcf"]
-        coverage_report = parent_details["output"]["stage-Fyq5z18433GfYZbp3vX1KqjB.report"]
+        try:
+            vcf_file = parent_details["input"]["stage-rpt_vep.vcf"]
+        except KeyError as exc:
+                print(f"stage-rpt_vep matches nothing, checking old stage ID: {exc}")
+            try:
+                vcf_file = parent_details["input"]["stage-G9Q0jzQ4vyJ3x37X4KBKXZ5v.vcf"]
+            except KeyError as exc:
+                print(f"stage-G9Q0jzQ4vyJ3x37X4KBKXZ5v matches nothing: {exc}")
+        try:
+            coverage_report = parent_details["output"]["stage-rpt_athena.report"]
+        except KeyError as exc:
+                print(f"stage-rpt_athena matches nothing, checking old stage ID: {exc}")
+            try:
+                coverage_report = parent_details["output"]["stage-Fyq5z18433GfYZbp3vX1KqjB.report"]
+            except KeyError as exc:
+                print(f"stage-Fyq5z18433GfYZbp3vX1KqjB matches nothing: {exc}")
 
         # Extract the sention job id from the vcf metadata
         sention_job_id=dxpy.describe(vcf_file)["createdBy"]["job"]
@@ -113,8 +127,16 @@ def get_cnv_call_details(reports):
         dxid=gen_xlsx_job).describe()["parentAnalysis"]
 
     # Find the input vcf id
-    vcf_id = dxpy.bindings.dxanalysis.DXAnalysis(
+    try:
+            vcf_id = dxpy.bindings.dxanalysis.DXAnalysis(
+        dxid=reports_analysis).describe()["input"]["stage-cnv_vep.vcf"]
+        except KeyError as exc:
+                print(f"stage-rpt_cnv_vep matches nothing, checking old stage ID: {exc}")
+            try:
+                vcf_id = dxpy.bindings.dxanalysis.DXAnalysis(
         dxid=reports_analysis).describe()["input"]["stage-GFYvJF04qq8VKgq34j30pZZ3.vcf"]
+            except KeyError as exc:
+                print(f"stage-GFYvJF04qq8VKgq34j30pZZ3 matches nothing: {exc}")
 
     # Find the cnv call job id
     cnv_call_job = dxpy.describe(vcf_id)["createdBy"]["job"]
@@ -181,8 +203,22 @@ def get_cnv_file_ids(reports, gcnv_dict):
             dxid=reports_analysis).describe()
 
         # Get the CNV report and seg file using the analysis id
-        cnv_workbook_id = reports_details["output"]["stage-GFfYY9j4qq8ZxpFpP8zKG7G0.xlsx_report"]
-        seg_id = reports_details["output"]["stage-GG2z5yQ4qq8vb2xp4pB8XByz.seg_file"]
+        try:
+            cnv_workbook_id = reports_details["output"]["stage-cnv_generate_workbook.xlsx_report"]
+        except KeyError as exc:
+                print(f"stage-cnv_generate_workbook matches nothing, checking old stage ID: {exc}")
+            try:
+                cnv_workbook_id = reports_details["output"]["stage-GFfYY9j4qq8ZxpFpP8zKG7G0.xlsx_report"]
+            except KeyError as exc:
+                print(f"stage-GFfYY9j4qq8ZxpFpP8zKG7G0 matches nothing: {exc}")
+        try:
+            seg_id = reports_details["output"]["stage-cnv_additional_tasks.seg_file"]
+        except KeyError as exc:
+                print(f"stage-cnv_additional_tasks matches nothing, checking old stage ID: {exc}")
+            try:
+                seg_id = reports_details["output"]["stage-GG2z5yQ4qq8vb2xp4pB8XByz.seg_file"]
+            except KeyError as exc:
+                print(f"stage-GG2z5yQ4qq8vb2xp4pB8XByz matches nothing: {exc}")
 
         # gCNV job has all input bams and all outputs go through info
         # saved in the dictionary and find the sample specific files required
@@ -594,6 +630,9 @@ def write_output_file(
     # make sample IDs bold
     for cell in sheet.iter_rows(max_col=1):
         if re.match(r'X[\d]+', cell[0].value):
+            sheet[cell[0].coordinate].font = Font(
+                bold=True, name=DEFAULT_FONT.name)
+        elif re.match(r'^[a-zA-Z0-9]-[a-zA-Z0-9]-[a-zA-Z0-9]-[a-zA-Z0-9]-[a-zA-Z0-9]-[a-zA-Z0-9]$', cell[0].value):
             sheet[cell[0].coordinate].font = Font(
                 bold=True, name=DEFAULT_FONT.name)
 
