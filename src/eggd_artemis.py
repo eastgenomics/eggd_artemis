@@ -612,7 +612,7 @@ def write_output_file(
         if re.match(r'X[\d]+', cell[0].value):
             sheet[cell[0].coordinate].font = Font(
                 bold=True, name=DEFAULT_FONT.name)
-        elif re.match(r'^[a-zA-Z0-9]-[a-zA-Z0-9]-[a-zA-Z0-9]-[a-zA-Z0-9]-[a-zA-Z0-9]-[a-zA-Z0-9]$', cell[0].value):
+        elif re.match(r'[a-zA-Z0-9]+-[a-zA-Z0-9]+-[a-zA-Z0-9]+-[a-zA-Z0-9]+-[MFU]-[a-zA-Z0-9]+', cell[0].value):
             sheet[cell[0].coordinate].font = Font(
                 bold=True, name=DEFAULT_FONT.name)
 
