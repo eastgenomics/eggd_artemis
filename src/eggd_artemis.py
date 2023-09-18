@@ -53,8 +53,14 @@ def find_snv_files(reports):
         # Get the vcf file id and athena coverage file id
         parent_details = dxpy.bindings.dxanalysis.DXAnalysis(
             dxid=parent_analysis).describe()
-        vcf_file = parent_details["input"]["stage-G9Q0jzQ4vyJ3x37X4KBKXZ5v.vcf"]
-        coverage_report = parent_details["output"]["stage-Fyq5z18433GfYZbp3vX1KqjB.report"]
+        try:
+            vcf_file = parent_details["input"]["stage-rpt_vep.vcf"]
+        except KeyError:
+            vcf_file = parent_details["input"]["stage-G9Q0jzQ4vyJ3x37X4KBKXZ5v.vcf"]
+        try:
+            coverage_report = parent_details["output"]["stage-rpt_athena.report"]
+        except KeyError:
+            coverage_report = parent_details["output"]["stage-Fyq5z18433GfYZbp3vX1KqjB.report"]
 
         # Extract the sention job id from the vcf metadata
         sention_job_id=dxpy.describe(vcf_file)["createdBy"]["job"]
@@ -113,8 +119,12 @@ def get_cnv_call_details(reports):
         dxid=gen_xlsx_job).describe()["parentAnalysis"]
 
     # Find the input vcf id
-    vcf_id = dxpy.bindings.dxanalysis.DXAnalysis(
-        dxid=reports_analysis).describe()["input"]["stage-GFYvJF04qq8VKgq34j30pZZ3.vcf"]
+    try:
+        vcf_id = dxpy.bindings.dxanalysis.DXAnalysis(
+            dxid=reports_analysis).describe()["input"]["stage-cnv_vep.vcf"]
+    except KeyError:
+        vcf_id = dxpy.bindings.dxanalysis.DXAnalysis(
+            dxid=reports_analysis).describe()["input"]["stage-GFYvJF04qq8VKgq34j30pZZ3.vcf"]
 
     # Find the cnv call job id
     cnv_call_job = dxpy.describe(vcf_id)["createdBy"]["job"]
@@ -181,8 +191,14 @@ def get_cnv_file_ids(reports, gcnv_dict):
             dxid=reports_analysis).describe()
 
         # Get the CNV report and seg file using the analysis id
-        cnv_workbook_id = reports_details["output"]["stage-GFfYY9j4qq8ZxpFpP8zKG7G0.xlsx_report"]
-        seg_id = reports_details["output"]["stage-GG2z5yQ4qq8vb2xp4pB8XByz.seg_file"]
+        try:
+            cnv_workbook_id = reports_details["output"]["stage-cnv_generate_workbook.xlsx_report"]
+        except KeyError:
+            cnv_workbook_id = reports_details["output"]["stage-GFfYY9j4qq8ZxpFpP8zKG7G0.xlsx_report"]
+        try:
+            seg_id = reports_details["output"]["stage-cnv_additional_tasks.seg_file"]
+        except KeyError:
+            seg_id = reports_details["output"]["stage-GG2z5yQ4qq8vb2xp4pB8XByz.seg_file"]
 
         # gCNV job has all input bams and all outputs go through info
         # saved in the dictionary and find the sample specific files required
@@ -594,6 +610,9 @@ def write_output_file(
     # make sample IDs bold
     for cell in sheet.iter_rows(max_col=1):
         if re.match(r'X[\d]+', cell[0].value):
+            sheet[cell[0].coordinate].font = Font(
+                bold=True, name=DEFAULT_FONT.name)
+        elif re.match(r'[a-zA-Z0-9]+-[a-zA-Z0-9]+-[a-zA-Z0-9]+-[a-zA-Z0-9]+-[MFU]-[a-zA-Z0-9]+', cell[0].value):
             sheet[cell[0].coordinate].font = Font(
                 bold=True, name=DEFAULT_FONT.name)
 
