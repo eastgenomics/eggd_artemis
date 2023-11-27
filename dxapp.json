@@ -45,7 +45,7 @@
   "outputSpec": [
     {
       "name": "url_file",
-      "label": "File contraining download links",
+      "label": "File containing download links",
       "class": "file",
       "patterns": [
         "*"
