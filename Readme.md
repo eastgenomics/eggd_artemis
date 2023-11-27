@@ -9,7 +9,7 @@ Gathers required files and creates file containing urls to allow file download w
 ## What inputs are required for this app to run?
 * `snv_path`[optional]: List of absolute paths to folder containing the variant reports for small variants
 * `cnv_path`[optional]: List of absolute paths to folder containing the variant reports for CNVs
-* `url_duration`[optional]: Time (in seconds) until the generated links expire. (Default = 1209600)
+* `url_duration`[optional]: Time (in seconds) until the generated links expire. (Default = 4838400)
 * `bed_file`[optional]: Static capture bed file
 * `qc_status`[optional]: Input of xlsx file containing agreed QC status for samples in the run
 
