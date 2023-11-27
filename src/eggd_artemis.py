@@ -43,6 +43,13 @@ def find_snv_files(reports):
         # Get sample name
         sample = report['describe']['name'].split("_")[0]
 
+        # Get the 'details' of the SNV xlsx report
+        # If file has no details this will be empty response i.e. '{}' so
+        # calling get for the include_variants key will result in None
+        snv_variant_count = dxpy.bindings.dxdataobject_functions.get_details(
+            report['id']
+        ).get('include_variants')
+
         # Get the job id that created the report
         job_id = report['describe']['createdBy']['job']
 
@@ -74,6 +81,7 @@ def find_snv_files(reports):
         data = {
             "sample": sample,
             "SNV variant report": report['describe']['id'],
+            "SNV count": snv_variant_count,
             "Coverage report": coverage_report,
             'Alignment BAM': mappings_bam,
             'Alignment BAI': mappings_bai
@@ -182,6 +190,14 @@ def get_cnv_file_ids(reports, gcnv_dict):
             data (dict): files found for sample
         """
         sample = report['describe']['name'].split("_")[0]
+
+        # Get the 'details' of the CNV xlsx report
+        # If file has no details this will be empty response i.e. '{}' so
+        # calling get for the include_variants key will result in None
+        cnv_variant_counts = dxpy.bindings.dxdataobject_functions.get_details(
+            report['id']
+        ).get('include_variants')
+
         gen_xlsx_job = report["describe"]["createdBy"]["job"]
 
         # Find the reports workflow analysis id
@@ -216,6 +232,7 @@ def get_cnv_file_ids(reports, gcnv_dict):
             'Alignment BAM': bam,
             'Alignment BAI': bai,
             'CNV variant report': cnv_workbook_id,
+            'CNV count': cnv_variant_counts,
             'CNV visualisation': gcnv_bed,
             'CNV calls for IGV': seg_id
         }
@@ -525,7 +542,7 @@ def generate_sample_urls(
 
 
 def write_output_file(
-    sample_urls, today, expiry_date, multiqc_url, qc_url, project_name):
+    sample_urls, file_dict, today, expiry_date, multiqc_url, qc_url, project_name):
     """
     Writes output xlsx file with all download URLs
 
@@ -533,6 +550,8 @@ def write_output_file(
     ----------
     sample_urls : dict
         generated URLs for each sample
+    file_dict : dict
+        dict created earlier with variant counts
     today : str
         today date
     expiry_date : str
@@ -541,6 +560,8 @@ def write_output_file(
         download URL for multiQC report
     qc_url : str
         download URL for QC report
+    project_name: str
+        project name
 
     Outputs
     -------
@@ -566,16 +587,20 @@ def write_output_file(
     df = df.append({'a': 'Per Sample Files'}, ignore_index=True)
     df = df.append({}, ignore_index=True)
 
-    sample_order = sorted(sample_urls.keys())
+    sample_urls_plus_metadata = merge(sample_urls, file_dict)
+
+    sample_order = sorted(sample_urls_plus_metadata.keys())
 
     for sample in sample_order:
-        urls = sample_urls.get(sample)
+        urls = sample_urls_plus_metadata.get(sample)
 
         df = df.append({'a': sample}, ignore_index=True)
 
         url_fields = {
             'coverage_url': 'Coverage report:',
+            'SNV count': 'Number of SNVs post-filtering',
             'snv_url': 'Small variant report',
+            'CNV count': 'Number of CNVs',
             'cnv_url': 'CNV variant report',
             'cnv_session_url': 'CNV IGV Session:',
             'bam_url': 'Alignment BAM',
@@ -584,6 +609,14 @@ def write_output_file(
 
         for field, label in url_fields.items():
             if urls.get(field):
+                if field == 'SNV count':
+                    if int(urls.get(field)) == 0:
+                        urls['snv_url'] = 'No SNVs pass filtering'
+
+                if field == 'CNV count':
+                    if (int(urls.get(field)) == 0):
+                        urls['cnv_url'] = 'No CNVs detected'
+
                 if field == 'bam_url':
                     df = df.append({}, ignore_index=True)
 
@@ -739,14 +772,14 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
     else:
         qc_status_url = 'No QC status file provided'
 
-    data = {}
+    file_data = {}
 
     if snv_path and cnv_path:
-        merge(data, snv_data, cnv_data)
+        merge(file_data, snv_data, cnv_data)
     elif snv_path:
-        data = snv_data
+        file_data = snv_data
     elif cnv_path:
-        data = cnv_data
+        file_data = cnv_data
     else:
         logger.debug("No paths given, exiting...")
         exit(1)
@@ -769,7 +802,7 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
             executor.submit(
                 generate_sample_urls, sample, sample_data, url_duration,
                 ex_intervals_url, bed_file_url, expiry_date, job_output
-            ) for sample, sample_data in data.items()
+            ) for sample, sample_data in file_data.items()
         }
 
         for future in concurrent.futures.as_completed(concurrent_jobs):
@@ -784,7 +817,7 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
     multiqc_url = make_url(multiqc, DX_PROJECT, url_duration)
 
     write_output_file(
-        all_sample_urls, today, expiry_date, multiqc_url,
+        all_sample_urls, file_data, today, expiry_date, multiqc_url,
         qc_status_url, project_name
     )
 
