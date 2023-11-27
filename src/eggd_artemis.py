@@ -610,10 +610,16 @@ def write_output_file(
         for field, label in url_fields.items():
             if urls.get(field):
                 if field == 'SNV count':
+                    # If SNV count exists and 0 variants pass filtering
+                    # Remove the SNV report URL altogether and replace with
+                    # NMD text
                     if int(urls.get(field)) == 0:
-                        urls['snv_url'] = 'No SNVs pass filtering'
+                        urls['snv_url'] = 'No SNVs passed filtering'
 
                 if field == 'CNV count':
+                    # If CNV count exists and 0 variants pass filtering
+                    # Remove the CNV report URL altogether and replace with
+                    # NMD text
                     if (int(urls.get(field)) == 0):
                         urls['cnv_url'] = 'No CNVs detected'
 
