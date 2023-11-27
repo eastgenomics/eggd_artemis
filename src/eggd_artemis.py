@@ -44,9 +44,9 @@ def find_snv_files(reports):
         sample = report['describe']['name'].split("_")[0]
 
         # Get the 'details' of the SNV xlsx report to return the number of
-        # include (non-filtered) variants
-        # If the xlsx has no details this will be empty response i.e. '{}' so
-        # calling get for the include_variants key will result in None
+        # variants remaining after filtering
+        # If the xlsx has no 'details' the response will be empty i.e. '{}'
+        # so getting the include_variants key will return None
         snv_variant_count = dxpy.bindings.dxdataobject_functions.get_details(
             report['id']
         ).get('include_variants')
@@ -193,8 +193,8 @@ def get_cnv_file_ids(reports, gcnv_dict):
         sample = report['describe']['name'].split("_")[0]
 
         # Get the 'details' of the CNV xlsx report to get number of variants
-        # If file has no details this will be empty response i.e. '{}' so
-        # calling get for the include_variants key will result in None
+        # If the xlsx has no 'details' the response will be empty i.e. '{}'
+        # so getting the include_variants key will return None
         cnv_variant_counts = dxpy.bindings.dxdataobject_functions.get_details(
             report['id']
         ).get('include_variants')
