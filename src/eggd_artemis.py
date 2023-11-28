@@ -570,12 +570,17 @@ def write_output_file(
     """
     print("Writing output file")
 
+    sample_urls_plus_metadata = merge(sample_urls, file_dict)
+    sample_count = str(len(sample_urls_plus_metadata.keys()))
+
     multiqc_url = f'=HYPERLINK("{multiqc_url}", "{multiqc_url}")'
     if qc_url.startswith('http'):
         qc_url = f'=HYPERLINK("{qc_url}", "{qc_url}")'
 
     df = pd.DataFrame(columns=['a', 'b'])
     df = df.append({'a': 'Run:', 'b': project_name}, ignore_index=True)
+    df = df.append({'a': 'Number of samples released:', 'b': sample_count},
+    ignore_index=True)
     df = df.append({}, ignore_index=True)
     df = df.append({'a': 'Date Created:', 'b': today}, ignore_index=True)
     df = df.append({'a': 'Expiry Date:', 'b': expiry_date}, ignore_index=True)
@@ -587,8 +592,6 @@ def write_output_file(
     df = df.append({}, ignore_index=True)
     df = df.append({'a': 'Per Sample Files'}, ignore_index=True)
     df = df.append({}, ignore_index=True)
-
-    sample_urls_plus_metadata = merge(sample_urls, file_dict)
 
     sample_order = sorted(sample_urls_plus_metadata.keys())
 
@@ -640,12 +643,13 @@ def write_output_file(
 
     # set column widths
     sheet = writer.sheets['Sheet1']
-    sheet.column_dimensions['A'].width = 20
+    sheet.column_dimensions['A'].width = 28
     sheet.column_dimensions['B'].width = 145
 
     sheet['A1'].font = Font(bold=True, name=DEFAULT_FONT.name)
-    sheet['A6'].font = Font(bold=True, name=DEFAULT_FONT.name)
-    sheet['A11'].font = Font(bold=True, name=DEFAULT_FONT.name)
+    sheet['A2'].font = Font(bold=True, name=DEFAULT_FONT.name)
+    sheet['A7'].font = Font(bold=True, name=DEFAULT_FONT.name)
+    sheet['A12'].font = Font(bold=True, name=DEFAULT_FONT.name)
 
     # make sample IDs bold
     for cell in sheet.iter_rows(max_col=1):
@@ -696,7 +700,7 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
 
     # Get name of project for output naming
     project_name = dxpy.describe(DX_PROJECT)['name']
-    project_name = '_'.join(project_name.split('_')[1:-1])
+    project_name = dxpy.describe(DX_PROJECT)['name']
 
     # Gather required SNV files if SNV path is provided
     multiqc = None
