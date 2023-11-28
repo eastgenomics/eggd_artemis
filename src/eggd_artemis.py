@@ -552,7 +552,8 @@ def write_output_file(
     sample_urls : dict
         generated URLs for each sample
     file_dict : dict
-        dict created earlier with variant counts
+        dict created earlier with SNV/CNV reports for all samples which
+        includes variant counts
     today : str
         today date
     expiry_date : str
@@ -699,7 +700,6 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
             "parents": True})
 
     # Get name of project for output naming
-    project_name = dxpy.describe(DX_PROJECT)['name']
     project_name = dxpy.describe(DX_PROJECT)['name']
 
     # Gather required SNV files if SNV path is provided
