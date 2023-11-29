@@ -627,6 +627,7 @@ def write_output_file(
                     # NMD text
                     if (int(urls.get(field)) == 0):
                         urls['cnv_url'] = 'No CNVs detected'
+                        urls['cnv_session_url'] = 'No CNVs detected'
 
                 if field == 'bam_url':
                     df = df.append({}, ignore_index=True)
