@@ -71,9 +71,8 @@ def find_snv_files(reports):
         # Get sample name
         sample = report['describe']['name'].split("_")[0]
         # Get file 'details' of the SNV xlsx report so that we can query
-        # the clinical indication and variant count
-        # If xlsx has no 'details' the response will be empty i.e. '{}'
-        # so return is None or default
+        # the clinical indication and variant count. If file has no 'details'
+        # set default return to "Unknown"
         file_details = dxpy.bindings.dxdataobject_functions.get_details(
             report['id']
         )
@@ -141,14 +140,15 @@ def find_snv_files(reports):
             # access returned output as each is returned in any order
             try:
                 data = future.result()
-                # Get info from the returned dict
+                # Get info from the returned dict (only ever 1 clinical
+                # indication and one set of SNV files)
                 sample = data['sample']
                 clin_ind = list(data['clinical_indications'])[0]
                 snv_files = data['clinical_indications'][clin_ind]['SNV'][0]
 
                 # If sample and clinical indication already exists, append SNV
                 # file info to the existing list. Otherwise merge to the
-                # existing sample dict to new clinical indication
+                # existing sample dict to add the new clinical indication
                 if sample in snv_data:
                     if clin_ind in snv_data[sample].get('clinical_indications'):
                         snv_data[sample][
@@ -281,14 +281,15 @@ def get_cnv_file_ids(reports, gcnv_dict):
         report_name = report['describe']['name']
         sample = report_name.split("_")[0]
         # Get end of CNV report name for naming IGV session file later
+        # because if multiple panels exist for 1 sample we don't want to name
+        # the separate session files the same thing
         cnv_file_ending = ('_').join(
             part for part in report_name.split("_")[1:]
         ).replace('.xlsx', '')
 
-        # Get the 'details' of the CNV xlsx report so that we can query
-        # clinical indication and variant count
-        # If the xlsx has no 'details' the response will be empty i.e. '{}'
-        # so get will return None
+        # Get file 'details' of the CNV xlsx report so that we can query
+        # the clinical indication and variant count. If file has no 'details'
+        # set default return to "Unknown"
         file_details = dxpy.bindings.dxdataobject_functions.get_details(
             report['id']
         )
@@ -328,9 +329,10 @@ def get_cnv_file_ids(reports, gcnv_dict):
 
         # Store in dictionary to return
         data = {
-            "sample": sample,
+            'sample': sample,
             'Alignment BAM': bam,
             'Alignment BAI': bai,
+            'CNV visualisation': gcnv_bed,
             'clinical_indications': {
                 clin_ind: {
                     'CNV': [
@@ -342,8 +344,7 @@ def get_cnv_file_ids(reports, gcnv_dict):
                         }
                     ]
                 }
-            },
-            'CNV visualisation': gcnv_bed
+            }
         }
 
         return data
@@ -370,7 +371,7 @@ def get_cnv_file_ids(reports, gcnv_dict):
 
                 # If sample and clinical indication already exists, append CNV
                 # file info to existing list. Otherwise merge to the
-                # existing sample dict to new clinical indication
+                # existing sample dict to add new clinical indication
                 if sample in cnv_data:
                     if clin_ind in cnv_data[sample].get('clinical_indications'):
                         cnv_data[sample][
@@ -522,7 +523,7 @@ def set_order_map(snv_only=False):
 
 
 def make_cnv_session(
-    sample, session_file_ending, bam_url, bai_url, bed_url,
+    sample, session_file_name, bam_url, bai_url, bed_url,
     seg_url, excluded_url, targets_url, job_output, expiry_date
 ):
     """ Create a session file for IGV
@@ -530,7 +531,7 @@ def make_cnv_session(
     Args:
         sessions_list (list): list of session files to upload in the end
         sample (string): sample name
-        session_file_ending (string): str to add to end of session file name
+        session_file_name (string): str to add to end of session file name
         bam_url (string): URL of the bam file
         bai_url (string): URL of the bai file
         bed_url (string): URL of the bed file
@@ -582,7 +583,7 @@ def make_cnv_session(
         template_copy['tracks'].append(track)
 
 
-    output_name = f"{sample}_{session_file_ending}_igv.json"
+    output_name = f"{sample}_{session_file_name}_igv.json"
 
     with open(output_name, "w") as outfile:
         json.dump(template_copy, outfile, indent=4)
@@ -623,7 +624,7 @@ def generate_sample_urls(
 
     Returns
     -------
-    dict
+    urls : dict
         dict of sample URLs
     """
     dx_project = os.environ.get("DX_PROJECT_CONTEXT_ID")
@@ -693,6 +694,7 @@ def generate_sample_urls(
 
                 urls['clinical_indications'][clin_ind]['CNV'].append({
                     'CNV count': cnv_file['CNV count'],
+                    'cnv_bed': cnv_bed,
                     'cnv_seg': cnv_seg,
                     'cnv_session_fileid': cnv_session,
                     'cnv_url': f'=HYPERLINK("{cnv_url}", "{cnv_url}")',
@@ -704,7 +706,7 @@ def generate_sample_urls(
     return urls
 
 
-def remove_urls_when_variant_count_is_zero(all_sample_urls):
+def remove_url_if_variant_count_is_zero(all_sample_urls):
     """
     Remove links to download Excel reports if there are no variants
 
@@ -723,9 +725,9 @@ def remove_urls_when_variant_count_is_zero(all_sample_urls):
         for clin_ind in sample_data['clinical_indications']:
             file_data = sample_data['clinical_indications'][clin_ind]
 
-            # Replace SNV report URL with text if variant count is zero,
-            # Otherwise if variant count was never found then replace with
-            # zero so we can easily not include variant count in final .xlsx
+            # Replace SNV report URL with text if variant count is zero.
+            # If variant count was never present then replace with
+            # None so we can easily not include variant count in final .xlsx
             if 'SNV' in file_data:
                 for file in file_data['SNV']:
                     if file.get('SNV count') == '0':
@@ -762,7 +764,7 @@ def write_output_file(
     qc_url : str
         download URL for QC report
     project_name: str
-        project name
+        DNAnexus project name
 
     Outputs
     -------
@@ -778,8 +780,10 @@ def write_output_file(
 
     df = pd.DataFrame(columns=['a', 'b'])
     df = df.append({'a': 'Run:', 'b': project_name}, ignore_index=True)
-    df = df.append({'a': 'Number of samples released:', 'b': sample_count},
-    ignore_index=True)
+    df = df.append(
+        {'a': 'Number of samples in this file:', 'b': sample_count},
+        ignore_index=True
+    )
     df = df.append({}, ignore_index=True)
     df = df.append({'a': 'Date Created:', 'b': today}, ignore_index=True)
     df = df.append({'a': 'Expiry Date:', 'b': expiry_date}, ignore_index=True)
@@ -799,7 +803,7 @@ def write_output_file(
 
         df = df.append({'a': sample}, ignore_index=True)
 
-        sample_level = {
+        sample_level_urls = {
             'bam_url': 'Alignment BAM',
             'bai_url': 'Alignment BAI'
         }
@@ -819,24 +823,24 @@ def write_output_file(
             if clinical_indication != 'Unknown':
                 df = df.append({'a': clinical_indication}, ignore_index=True)
 
-                for field, label in url_fields.items():
-                    if file_data.get('SNV'):
-                        for snv_data in file_data['SNV']:
-                            if snv_data.get(field):
-                                df = df.append(
-                                    {'a': label, 'b': snv_data.get(field)},
-                                    ignore_index=True
-                                )
+            for field, label in url_fields.items():
+                if file_data.get('SNV'):
+                    for snv_data in file_data['SNV']:
+                        if snv_data.get(field):
+                            df = df.append(
+                                {'a': label, 'b': snv_data.get(field)},
+                                ignore_index=True
+                            )
 
-                    if file_data.get('CNV'):
-                        for cnv_data in file_data['CNV']:
-                            if cnv_data.get(field):
-                                df = df.append(
-                                    {'a': label, 'b': cnv_data.get(field)},
-                                    ignore_index=True
-                                )
+                if file_data.get('CNV'):
+                    for cnv_data in file_data['CNV']:
+                        if cnv_data.get(field):
+                            df = df.append(
+                                {'a': label, 'b': cnv_data.get(field)},
+                                ignore_index=True
+                            )
 
-        for field, label in sample_level.items():
+        for field, label in sample_level_urls.items():
             if urls.get(field):
                 if field == 'bam_url':
                     df = df.append({}, ignore_index=True)
@@ -862,7 +866,7 @@ def write_output_file(
     sheet['A7'].font = Font(bold=True, name=DEFAULT_FONT.name)
     sheet['A12'].font = Font(bold=True, name=DEFAULT_FONT.name)
 
-    # make sample IDs bold
+    # make sample IDs and any clinical indication names bold
     for cell in sheet.iter_rows(max_col=1):
         if re.match(r'X[\d]+', cell[0].value):
             sheet[cell[0].coordinate].font = Font(
@@ -1041,7 +1045,9 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
 
     multiqc_url = make_url(multiqc, DX_PROJECT, url_duration)
 
-    all_sample_urls = remove_urls_when_variant_count_is_zero(all_sample_urls)
+    # Remove download URLs for reports with no variants in
+    all_sample_urls = remove_url_if_variant_count_is_zero(all_sample_urls)
+
     write_output_file(
         all_sample_urls, today, expiry_date, multiqc_url,
         qc_status_url, project_name
