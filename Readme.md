@@ -12,6 +12,8 @@ Gathers required files and creates file containing urls to allow file download w
 * `url_duration`[optional]: Time (in seconds) until the generated links expire. (Default = 4838400)
 * `bed_file`[optional]: Static capture bed file
 * `qc_status`[optional]: Input of xlsx file containing agreed QC status for samples in the run
+* `multiqc_report`[optional]: Input of the MultiQC report - if not provided, will search for a MultiQC job in the project to find this
+* `lock_cells`[optional]: Determines whether to protect any populated cells in the output .xlsx from editing (Default=True)
 
 ## How does this app work?
 

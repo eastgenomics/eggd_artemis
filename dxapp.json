@@ -40,6 +40,21 @@
       "class": "file",
       "optional": true,
       "help": ""
+    },
+    {
+      "name": "multiqc_report",
+      "label": "MultiQC report",
+      "class": "file",
+      "optional": true,
+      "help": "MultiQC report. If not provided, will search for a MultiQC job in the project"
+    },
+    {
+      "name": "lock_cells",
+      "label": "Lock populated Excel cells",
+      "class": "boolean",
+      "optional": true,
+      "default": true,
+      "help": "Boolean which controls whether to lock any cells for editing if they are populated in the Excel output file"
     }
   ],
   "outputSpec": [

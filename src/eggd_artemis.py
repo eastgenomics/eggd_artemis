@@ -17,7 +17,7 @@ for package in os.listdir("/home/dnanexus/packages"):
 
 from collections import defaultdict
 from mergedeep import merge
-from openpyxl.styles import DEFAULT_FONT, Font
+from openpyxl.styles import DEFAULT_FONT, Font, Protection
 import pandas as pd
 
 
@@ -157,7 +157,7 @@ def find_snv_files(reports):
 
                     else:
                         merge(snv_data[sample], data)
-                # If sample doesn't exist yet just add the data as is
+                # If sample doesn't exist just add the data to sample key as is
                 else:
                     snv_data[sample] = data
 
@@ -282,7 +282,7 @@ def get_cnv_file_ids(reports, gcnv_dict):
         sample = report_name.split("_")[0]
         # Get end of CNV report name for naming IGV session file later
         # because if multiple panels exist for 1 sample we don't want to name
-        # the separate session files the same thing
+        # the separate session files the same
         cnv_file_ending = ('_').join(
             part for part in report_name.split("_")[1:]
         ).replace('.xlsx', '')
@@ -641,7 +641,7 @@ def generate_sample_urls(
     # Loop over clinical indications
     for clin_ind in sample_data['clinical_indications']:
         snv_files = sample_data['clinical_indications'][clin_ind].get('SNV')
-        # If we have SNV reports, for each report make URLs and add dict to
+        # If we have SNV reports, for each report make URLs and append to
         # SNV value
         if snv_files:
             urls['clinical_indications'][clin_ind]['SNV'] = []
@@ -665,7 +665,7 @@ def generate_sample_urls(
                 )
 
         # If we have CNV reports, for each report make URLs/session files
-        # and add to dict to CNV value
+        # and append to CNV value
         cnv_files = sample_data['clinical_indications'][clin_ind].get('CNV')
         if cnv_files:
             cnv_bed = make_url(
@@ -727,7 +727,7 @@ def remove_url_if_variant_count_is_zero(all_sample_urls):
 
             # Replace SNV report URL with text if variant count is zero.
             # If variant count was never present then replace with
-            # None so we can easily not include variant count in final .xlsx
+            # None so we can easily not include this field in final .xlsx
             if 'SNV' in file_data:
                 for file in file_data['SNV']:
                     if file.get('SNV count') == '0':
@@ -747,7 +747,8 @@ def remove_url_if_variant_count_is_zero(all_sample_urls):
 
 
 def write_output_file(
-    sample_urls, today, expiry_date, multiqc_url, qc_url, project_name):
+    sample_urls, today, expiry_date, multiqc_url, qc_url, project_name,
+    lock_cells):
     """
     Writes output xlsx file with all download URLs
 
@@ -765,6 +766,8 @@ def write_output_file(
         download URL for QC report
     project_name: str
         DNAnexus project name
+    lock_cells : boolean
+        determines whether to lock any populated cells for editing
 
     Outputs
     -------
@@ -803,11 +806,13 @@ def write_output_file(
 
         df = df.append({'a': sample}, ignore_index=True)
 
+        # Fields we need once per sample
         sample_level_urls = {
             'bam_url': 'Alignment BAM',
             'bai_url': 'Alignment BAI'
         }
 
+        # Fields we need once per report
         url_fields = {
             'coverage_url': 'Coverage report',
             'SNV count': 'SNV count post-filtering',
@@ -820,9 +825,11 @@ def write_output_file(
         for clinical_indication in urls['clinical_indications']:
             file_data = urls['clinical_indications'][clinical_indication]
 
+            # If we know clinical indication add this as a header
             if clinical_indication != 'Unknown':
                 df = df.append({'a': clinical_indication}, ignore_index=True)
 
+            # Add fields for any SNV files first for that clinical indication
             for field, label in url_fields.items():
                 if file_data.get('SNV'):
                     for snv_data in file_data['SNV']:
@@ -832,6 +839,7 @@ def write_output_file(
                                 ignore_index=True
                             )
 
+                # Then add fields for CNV fields for that clinical indication
                 if file_data.get('CNV'):
                     for cnv_data in file_data['CNV']:
                         if cnv_data.get(field):
@@ -839,7 +847,7 @@ def write_output_file(
                                 {'a': label, 'b': cnv_data.get(field)},
                                 ignore_index=True
                             )
-
+        # Add BAM and BAI URLs for the sample
         for field, label in sample_level_urls.items():
             if urls.get(field):
                 if field == 'bam_url':
@@ -866,23 +874,45 @@ def write_output_file(
     sheet['A7'].font = Font(bold=True, name=DEFAULT_FONT.name)
     sheet['A12'].font = Font(bold=True, name=DEFAULT_FONT.name)
 
-    # make sample IDs and any clinical indication names bold
+    # If input lock_cells is True we're protecting populated cells
+    # from editing so enable worksheet protection. openpyxl is silly and
+    # you need to lock a whole sheet then unlock specific cells
+    # so unlock the first 1000 rows and 100 columns
+    if lock_cells:
+        print("Locking cells set to True, will lock any populated Excel cells")
+        sheet.protection.sheet = True
+
+        for row_no in range(1, 1000):
+            for col_no in range(1, 100):
+                sheet.cell(row=row_no, column=col_no).protection = Protection(locked=False)
+    else:
+        print("Locking cells set to False, all Excel cells will be editable")
+
+    # Make sample IDs and any clinical indication names bold
+    # Lock any cells in column A for editing if they're populated
     for cell in sheet.iter_rows(max_col=1):
-        if re.match(r'X[\d]+', cell[0].value):
-            sheet[cell[0].coordinate].font = Font(
-                bold=True, name=DEFAULT_FONT.name)
-        elif re.match(r'[a-zA-Z0-9]+-[a-zA-Z0-9]+-[a-zA-Z0-9]+-[a-zA-Z0-9]+-[MFU]-[a-zA-Z0-9]+', cell[0].value):
-            sheet[cell[0].coordinate].font = Font(
-                bold=True, name=DEFAULT_FONT.name)
-        elif re.match(r'[RC][\d]+\.[\d]+|_HGNC:[\d]+', cell[0].value):
-            sheet[cell[0].coordinate].font = Font(
-                bold=True, name=DEFAULT_FONT.name)
+        if cell[0].value:
+            if re.match(r'X[\d]+', cell[0].value):
+                sheet[cell[0].coordinate].font = Font(
+                    bold=True, name=DEFAULT_FONT.name)
+            elif re.match(r'[a-zA-Z0-9]+-[a-zA-Z0-9]+-[a-zA-Z0-9]+-[a-zA-Z0-9]+-[MFU]-[a-zA-Z0-9]+', cell[0].value):
+                sheet[cell[0].coordinate].font = Font(
+                    bold=True, name=DEFAULT_FONT.name)
+            elif re.match(r'[RC][\d]+\.[\d]+|_HGNC:[\d]+', cell[0].value):
+                sheet[cell[0].coordinate].font = Font(
+                    bold=True, name=DEFAULT_FONT.name)
+            if lock_cells:
+                cell[0].protection = Protection(locked=True)
 
     # make hyperlinks blue
+    # Lock any cells in column B for editing if they're populated'
     for cell in sheet.iter_rows(min_col=2, max_col=2):
-        if 'HYPERLINK' in str(cell[0].value):
-            sheet[cell[0].coordinate].font = Font(
-                color='00007f', name=DEFAULT_FONT.name)
+        if cell[0].value:
+            if 'HYPERLINK' in str(cell[0].value):
+                sheet[cell[0].coordinate].font = Font(
+                    color='00007f', name=DEFAULT_FONT.name)
+            if lock_cells:
+                cell[0].protection = Protection(locked=True)
 
     writer.book.save(f'{project_name}_{today}.xlsx')
 
@@ -890,7 +920,7 @@ def write_output_file(
 
 
 @dxpy.entry_point('main')
-def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=None):
+def main(url_duration, lock_cells=True, snv_path=None, cnv_path=None, bed_file=None, qc_status=None, multiqc_report=None):
 
     # Set up logging
     logger = logging.getLogger(__name__)
@@ -921,7 +951,6 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
     project_name = '_'.join(project_name.split('_')[1:-1])
 
     # Gather required SNV files if SNV path is provided
-    multiqc = None
     if snv_path:
         logger.info("Gathering Small variant files")
 
@@ -942,8 +971,15 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
 
         print(f"Size of snv data dict: {len(snv_data.keys())}")
 
-        # Get multiqc report
-        multiqc = get_multiqc_report(snv_path.split(',')[0], DX_PROJECT)
+        # If multiqc report not given, search for multiqc report
+        if not multiqc_report:
+            print(
+                "No MultiQC report given, searching instead "
+                f"with path {snv_path}"
+            )
+            multiqc_report = get_multiqc_report(
+                snv_path.split(',')[0], DX_PROJECT
+            )
 
     # Gather required CNV files if CNV path is provided
     if cnv_path:
@@ -979,9 +1015,15 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
 
         print(f"Size of cnv data dict: {len(cnv_data.keys())}")
 
-        # Get multiqc report
-        if not multiqc:
-            multiqc = get_multiqc_report(cnv_path.split(',')[0], DX_PROJECT)
+        # If multiqc report not given or found earlier, search for it
+        if not multiqc_report:
+            print(
+                "No MultiQC report given, searching instead "
+                f"with path {cnv_path}"
+            )
+            multiqc_report = get_multiqc_report(
+                cnv_path.split(',')[0], DX_PROJECT
+            )
     else:
         ex_intervals_url = ''
 
@@ -1043,14 +1085,14 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
                 # catch any errors that might get raised during querying
                 print(f"Error getting data for {concurrent_jobs[future]}: {exc}")
 
-    multiqc_url = make_url(multiqc, DX_PROJECT, url_duration)
+    multiqc_url = make_url(multiqc_report, DX_PROJECT, url_duration)
 
     # Remove download URLs for reports with no variants in
     all_sample_urls = remove_url_if_variant_count_is_zero(all_sample_urls)
 
     write_output_file(
         all_sample_urls, today, expiry_date, multiqc_url,
-        qc_status_url, project_name
+        qc_status_url, project_name, lock_cells
     )
 
     # Upload output to the platform
