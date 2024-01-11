@@ -8,6 +8,7 @@ import dxpy
 import json
 import datetime
 import logging
+from collections import defaultdict
 from copy import deepcopy
 
 # Install required packages
@@ -15,7 +16,6 @@ for package in os.listdir("/home/dnanexus/packages"):
     print(f"Installing {package}")
     pip.main(["install", "--no-index", "--no-deps", f"packages/{package}"])
 
-from collections import defaultdict
 from mergedeep import merge
 from openpyxl.styles import DEFAULT_FONT, Font, Protection
 import pandas as pd
@@ -866,27 +866,33 @@ def write_output_file(
 
     # set column widths
     sheet = writer.sheets['Sheet1']
-    sheet.column_dimensions['A'].width = 28
-    sheet.column_dimensions['B'].width = 145
+    sheet.column_dimensions['A'].width = 55
+    sheet.column_dimensions['B'].width = 155
 
     sheet['A1'].font = Font(bold=True, name=DEFAULT_FONT.name)
     sheet['A2'].font = Font(bold=True, name=DEFAULT_FONT.name)
     sheet['A7'].font = Font(bold=True, name=DEFAULT_FONT.name)
     sheet['A12'].font = Font(bold=True, name=DEFAULT_FONT.name)
 
-    # If input lock_cells is True we're protecting populated cells
-    # from editing so enable worksheet protection. openpyxl is silly and
-    # you need to lock a whole sheet then unlock specific cells
-    # so unlock the first 1000 rows and 100 columns
+    # If lock_cells=True we're protecting populated cells from editing
+    # openpyxl is silly and you need to lock a whole sheet then unlock
+    # specific cells - so this unlocks the first 3000 rows and 100 columns
+    # (assuming at most 20 rows / sample and 96 samples per run).
+    # Also set format so that we can still resize rows/columns if protected
     if lock_cells:
-        print("Locking cells set to True, will lock any populated Excel cells")
+        print("lock_cells=True, locking any populated Excel cells")
         sheet.protection.sheet = True
+        sheet.protection.formatColumns = False
+        sheet.protection.formatRows = False
+        sheet.protection.formatCells = False
 
-        for row_no in range(1, 1000):
+        for row_no in range(1, 3000):
             for col_no in range(1, 100):
-                sheet.cell(row=row_no, column=col_no).protection = Protection(locked=False)
+                sheet.cell(row=row_no, column=col_no).protection = Protection(
+                    locked=False
+                )
     else:
-        print("Locking cells set to False, all Excel cells will be editable")
+        print("lock_cells=False, all Excel cells will be editable")
 
     # Make sample IDs and any clinical indication names bold
     # Lock any cells in column A for editing if they're populated
@@ -983,7 +989,7 @@ def main(url_duration, lock_cells=True, snv_path=None, cnv_path=None, bed_file=N
 
     # Gather required CNV files if CNV path is provided
     if cnv_path:
-        logger.info("Gathering CNV  files")
+        logger.info("Gathering CNV files")
 
         # Create folder for session files
         dxpy.api.project_new_folder(
