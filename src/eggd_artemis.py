@@ -73,9 +73,7 @@ def find_snv_files(reports):
         # Get file 'details' of the SNV xlsx report so that we can query
         # the clinical indication and variant count. If file has no 'details'
         # set default return to "Unknown"
-        file_details = dxpy.bindings.dxdataobject_functions.get_details(
-            report['id']
-        )
+        file_details = dxpy.DXFile(report['id']).get_details()
         clinical_indication = file_details.get(
             'clinical_indication', 'Unknown'
         )
@@ -128,7 +126,9 @@ def find_snv_files(reports):
 
         return data
 
-    snv_data = {}
+    snv_data = defaultdict(
+        lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    )
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
         # submit jobs mapping each id to describe call
@@ -146,20 +146,14 @@ def find_snv_files(reports):
                 clin_ind = list(data['clinical_indications'])[0]
                 snv_files = data['clinical_indications'][clin_ind]['SNV'][0]
 
-                # If sample and clinical indication already exists, append SNV
-                # file info to the existing list. Otherwise merge to the
-                # existing sample dict to add the new clinical indication
-                if sample in snv_data:
-                    if clin_ind in snv_data[sample].get('clinical_indications'):
-                        snv_data[sample][
-                            'clinical_indications'
-                        ][clin_ind]['SNV'].append(snv_files)
-
-                    else:
-                        merge(snv_data[sample], data)
-                # If sample doesn't exist just add the data to sample key as is
-                else:
-                    snv_data[sample] = data
+                # Add in sample name, BAM and BAI info then append the SNV
+                # file info to the relevant clinical indication
+                snv_data[sample]['sample'] = data['sample']
+                snv_data[sample]['Alignment BAM'] = data['Alignment BAM']
+                snv_data[sample]['Alignment BAI'] = data['Alignment BAI']
+                snv_data[sample][
+                    'clinical_indications'
+                ][clin_ind]['SNV'].append(snv_files)
 
             except Exception as exc:
                 # catch any errors that might get raised during querying
@@ -283,16 +277,12 @@ def get_cnv_file_ids(reports, gcnv_dict):
         # Get end of CNV report name for naming IGV session file later
         # because if multiple panels exist for 1 sample we don't want to name
         # the separate session files the same
-        cnv_file_ending = ('_').join(
-            part for part in report_name.split("_")[1:]
-        ).replace('.xlsx', '')
+        cnv_file_ending = report_name.split('_', 1)[1].replace('.xlsx', '')
 
         # Get file 'details' of the CNV xlsx report so that we can query
         # the clinical indication and variant count. If file has no 'details'
         # set default return to "Unknown"
-        file_details = dxpy.bindings.dxdataobject_functions.get_details(
-            report['id']
-        )
+        file_details = dxpy.DXFile(report['id']).get_details()
         clin_ind = file_details.get(
             'clinical_indication', 'Unknown'
         )
@@ -350,7 +340,9 @@ def get_cnv_file_ids(reports, gcnv_dict):
         return data
 
 
-    cnv_data = {}
+    cnv_data = defaultdict(
+        lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    )
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
         # submit jobs mapping each id to describe call
@@ -370,19 +362,17 @@ def get_cnv_file_ids(reports, gcnv_dict):
                 cnv_info = data['clinical_indications'][clin_ind]['CNV'][0]
 
                 # If sample and clinical indication already exists, append CNV
-                # file info to existing list. Otherwise merge to the
-                # existing sample dict to add new clinical indication
-                if sample in cnv_data:
-                    if clin_ind in cnv_data[sample].get('clinical_indications'):
-                        cnv_data[sample][
-                            'clinical_indications'
-                        ][clin_ind]['CNV'].append(cnv_info)
-                    else:
-                        merge(cnv_data[sample], data)
-
+                # file info to existing list.
                 # If sample doesn't exist yet just add the data as is
-                else:
-                    cnv_data[sample] = data
+                cnv_data[sample]['sample'] = data['sample']
+                cnv_data[sample]['Alignment BAM'] = data['Alignment BAM']
+                cnv_data[sample]['Alignment BAI'] = data['Alignment BAI']
+                cnv_data[sample][
+                    'CNV visualisation'
+                ] = data['CNV visualisation']
+                cnv_data[sample][
+                    'clinical_indications'
+                ][clin_ind]['CNV'].append(cnv_info)
 
             except Exception as exc:
                 # catch any errors that might get raised during querying
@@ -582,7 +572,6 @@ def make_cnv_session(
 
         template_copy['tracks'].append(track)
 
-
     output_name = f"{sample}_{session_file_name}_igv.json"
 
     with open(output_name, "w") as outfile:
@@ -748,7 +737,8 @@ def remove_url_if_variant_count_is_zero(all_sample_urls):
 
 def write_output_file(
     sample_urls, today, expiry_date, multiqc_url, qc_url, project_name,
-    lock_cells):
+    lock_cells
+):
     """
     Writes output xlsx file with all download URLs
 
@@ -831,22 +821,20 @@ def write_output_file(
 
             # Add fields for any SNV files first for that clinical indication
             for field, label in url_fields.items():
-                if file_data.get('SNV'):
-                    for snv_data in file_data['SNV']:
-                        if snv_data.get(field):
-                            df = df.append(
-                                {'a': label, 'b': snv_data.get(field)},
-                                ignore_index=True
-                            )
+                for snv_data in file_data.get('SNV', {}):
+                    if snv_data.get(field):
+                        df = df.append(
+                            {'a': label, 'b': snv_data.get(field)},
+                            ignore_index=True
+                        )
 
                 # Then add fields for CNV fields for that clinical indication
-                if file_data.get('CNV'):
-                    for cnv_data in file_data['CNV']:
-                        if cnv_data.get(field):
-                            df = df.append(
-                                {'a': label, 'b': cnv_data.get(field)},
-                                ignore_index=True
-                            )
+                for cnv_data in file_data.get('CNV', {}):
+                    if cnv_data.get(field):
+                        df = df.append(
+                            {'a': label, 'b': cnv_data.get(field)},
+                            ignore_index=True
+                        )
         # Add BAM and BAI URLs for the sample
         for field, label in sample_level_urls.items():
             if urls.get(field):
@@ -876,8 +864,8 @@ def write_output_file(
 
     # If lock_cells=True we're protecting populated cells from editing
     # openpyxl is silly and you need to lock a whole sheet then unlock
-    # specific cells - so this unlocks the first 3000 rows and 100 columns
-    # (assuming at most 20 rows / sample and 96 samples per run).
+    # specific cells - so to do the opposite we unlock the first 3000 rows
+    # and 100 columns (assuming max 20 rows / sample and 96 samples per run).
     # Also set format so that we can still resize rows/columns if protected
     if lock_cells:
         print("lock_cells=True, locking any populated Excel cells")
@@ -926,7 +914,10 @@ def write_output_file(
 
 
 @dxpy.entry_point('main')
-def main(url_duration, lock_cells=True, snv_path=None, cnv_path=None, bed_file=None, qc_status=None, multiqc_report=None):
+def main(
+    url_duration, lock_cells=True, snv_path=None, cnv_path=None,
+    bed_file=None, qc_status=None, multiqc_report=None
+):
 
     # Set up logging
     logger = logging.getLogger(__name__)
@@ -1110,13 +1101,42 @@ def main(url_duration, lock_cells=True, snv_path=None, cnv_path=None, bed_file=N
     )
     output["url_file"] = dxpy.dxlink(url_file)
 
-    session_files = [
-        cnv_item.get('cnv_session_fileid')
-        for key, entry in all_sample_urls.items()
-        for clin_ind in entry.get('clinical_indications')
-        if entry['clinical_indications'][clin_ind].get('CNV')
-        for cnv_item in entry['clinical_indications'][clin_ind]['CNV']
-    ]
+    # Find session files to link to output
+    """
+    Example all_sample_urls format we're looping over:
+    'sample-name': {
+        'sample': 'sample-name',
+        'bam_url': 'url_for_bam',
+        'bai_url':  'url_for_bai',
+        'clinical_indications': {
+            'R141.1': {
+                'SNV': [{
+                    'SNV count': '7',
+                    'coverage_url: '=HYPERLINK("hyperlink", "hyperlink"),
+                    'snv_url': '=HYPERLINK("hyperlink", "hyperlink"),
+                }],
+                'CNV': [{
+                    'CNV count': '1',
+                    'cnv_bed': 'bed_url',
+                    'cnv_seg': 'seg_url',
+                    'cnv_session_fileid': 'file-XYZ',
+                    'cnv_url': '=HYPERLINK("hyperlink", "hyperlink"),
+                    'cnv_session_url': '=HYPERLINK("hyperlink", "hyperlink")
+                }]
+            }
+        }
+    }
+    """
+    session_files = []
+    for sample, sample_info in all_sample_urls.items():
+        for clin_ind in sample_info.get('clinical_indications'):
+            if sample_info['clinical_indications'][clin_ind].get('CNV'):
+                for cnv_item in (
+                    sample_info['clinical_indications'][clin_ind]['CNV']
+                ):
+                    session_file_id = cnv_item['cnv_session_fileid']
+                    session_files.append(session_file_id)
+
     print(f"Found {len(session_files)} session files to link to job output")
     if session_files:
         output["session_files"] = [dxpy.dxlink(item) for item in session_files]
