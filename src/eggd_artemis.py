@@ -8,6 +8,7 @@ import dxpy
 import json
 import datetime
 import logging
+from collections import defaultdict
 from copy import deepcopy
 
 # Install required packages
@@ -16,7 +17,7 @@ for package in os.listdir("/home/dnanexus/packages"):
     pip.main(["install", "--no-index", "--no-deps", f"packages/{package}"])
 
 from mergedeep import merge
-from openpyxl.styles import DEFAULT_FONT, Font
+from openpyxl.styles import DEFAULT_FONT, Font, Protection
 import pandas as pd
 
 
@@ -28,7 +29,34 @@ def find_snv_files(reports):
 
     Returns:
         snv_data (dict): Nested dictionary of files with sample name
-            as key and a list of files as values with key labels
+            as key and list of SNV files within each clinical indication
+    Example:
+    {
+        'X123456-GM1234567-23NGCEN23-1234-F-99347387: {
+            'sample': 'X123456-GM1234567-23NGCEN23-1234-F-99347387',
+            'Alignment BAI': {'$dnanexus_link: 'file-XX'},
+            'Alignment BAI': {'$dnanexus_link: 'file-XY'},
+            'clinical_indications': {
+                'R414.1_APC associated Polyposis_G': {
+                    'SNV': [
+                        {
+                            'SNV variant report': 'file-ZX',
+                            'Coverage report': {'$dnanexus_link': 'file-GH'},
+                            'SNV count': 1
+                        }
+                    ],
+                'R208.1_Inherited breast cancer and ovarian cancer_P': {
+                    'SNV': [
+                        {
+                            'SNV variant report': 'file-GH',
+                            'Coverage report': {'$dnanexus_link': 'file-GH'},
+                            'SNV count': 3
+                        }
+                    ]
+                }
+            }
+        }
+    }
     """
     def _find(report):
         """
@@ -42,6 +70,14 @@ def find_snv_files(reports):
         """
         # Get sample name
         sample = report['describe']['name'].split("_")[0]
+        # Get file 'details' of the SNV xlsx report so that we can query
+        # the clinical indication and variant count. If file has no 'details'
+        # set default return to "Unknown"
+        file_details = dxpy.DXFile(report['id']).get_details()
+        clinical_indication = file_details.get(
+            'clinical_indication', 'Unknown'
+        )
+        snv_variant_count = file_details.get('included', 'Unknown')
 
         # Get the job id that created the report
         job_id = report['describe']['createdBy']['job']
@@ -73,15 +109,26 @@ def find_snv_files(reports):
         # Store in dictionary to return
         data = {
             "sample": sample,
-            "SNV variant report": report['describe']['id'],
-            "Coverage report": coverage_report,
             'Alignment BAM': mappings_bam,
-            'Alignment BAI': mappings_bai
+            'Alignment BAI': mappings_bai,
+            'clinical_indications': {
+                clinical_indication: {
+                    'SNV': [
+                        {
+                            "SNV variant report": report['describe']['id'],
+                            "Coverage report": coverage_report,
+                            "SNV count": str(snv_variant_count)
+                        }
+                    ]
+                }
+            }
         }
 
         return data
 
-    snv_data = {}
+    snv_data = defaultdict(
+        lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    )
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
         # submit jobs mapping each id to describe call
@@ -93,7 +140,21 @@ def find_snv_files(reports):
             # access returned output as each is returned in any order
             try:
                 data = future.result()
-                snv_data[data['sample']] = data
+                # Get info from the returned dict (only ever 1 clinical
+                # indication and one set of SNV files)
+                sample = data['sample']
+                clin_ind = list(data['clinical_indications'])[0]
+                snv_files = data['clinical_indications'][clin_ind]['SNV'][0]
+
+                # Add in sample name, BAM and BAI info then append the SNV
+                # file info to the relevant clinical indication
+                snv_data[sample]['sample'] = data['sample']
+                snv_data[sample]['Alignment BAM'] = data['Alignment BAM']
+                snv_data[sample]['Alignment BAI'] = data['Alignment BAI']
+                snv_data[sample][
+                    'clinical_indications'
+                ][clin_ind]['SNV'].append(snv_files)
+
             except Exception as exc:
                 # catch any errors that might get raised during querying
                 print(f"Error getting data for {concurrent_jobs[future]}: {exc}")
@@ -169,7 +230,37 @@ def get_cnv_file_ids(reports, gcnv_dict):
 
     Returns:
         cnv_data (dict): Nested dictionary of files with sample name
-            as key and a list of files as values with key labels
+            as key and nested dict of CNV files by clinical indication
+    Example:
+    {
+        'X123456-GM1234567-23NGCEN23-1234-F-99347387: {
+            'sample': 'X123456-GM1234567-23NGCEN23-1234-F-99347387',
+            'Alignment BAI': {'$dnanexus_link: 'file-XX'},
+            'Alignment BAI': {'$dnanexus_link: 'file-XY'},
+            'clinical_indications': {
+                'R414.1_APC associated Polyposis_G': {
+                    'CNV': [
+                        {
+                            'CNV variant report': 'file-ZX',
+                            'CNV calls for IGV': {'$dnanexus_link': 'file-TU'},
+                            'CNV count': 0,
+                            'Session file name': 'R414.1_CNV_1'
+                        }
+                    ],
+                'R208.1_Inherited breast cancer and ovarian cancer_P': {
+                    'CNV': [
+                        {
+                            'CNV variant report': 'file-OP',
+                            'CNV calls for IGV': {'$dnanexus_link': 'file-LM'},
+                            'CNV count': 0,
+                            'Session file name': 'R208.1_CNV_1'
+                        }
+                    ]
+                }
+            },
+            'CNV visualisation': 'file-ABC'
+        }
+    }
     """
     def _find(report):
         """
@@ -181,7 +272,22 @@ def get_cnv_file_ids(reports, gcnv_dict):
         Returns:
             data (dict): files found for sample
         """
-        sample = report['describe']['name'].split("_")[0]
+        report_name = report['describe']['name']
+        sample = report_name.split("_")[0]
+        # Get end of CNV report name for naming IGV session file later
+        # because if multiple panels exist for 1 sample we don't want to name
+        # the separate session files the same
+        cnv_file_ending = report_name.split('_', 1)[1].replace('.xlsx', '')
+
+        # Get file 'details' of the CNV xlsx report so that we can query
+        # the clinical indication and variant count. If file has no 'details'
+        # set default return to "Unknown"
+        file_details = dxpy.DXFile(report['id']).get_details()
+        clin_ind = file_details.get(
+            'clinical_indication', 'Unknown'
+        )
+        cnv_variant_count = file_details.get('variants', 'Unknown')
+
         gen_xlsx_job = report["describe"]["createdBy"]["job"]
 
         # Find the reports workflow analysis id
@@ -211,18 +317,32 @@ def get_cnv_file_ids(reports, gcnv_dict):
                 elif k.endswith(".bed.gz"):
                     gcnv_bed = v
 
+        # Store in dictionary to return
         data = {
             'sample': sample,
             'Alignment BAM': bam,
             'Alignment BAI': bai,
-            'CNV variant report': cnv_workbook_id,
             'CNV visualisation': gcnv_bed,
-            'CNV calls for IGV': seg_id
+            'clinical_indications': {
+                clin_ind: {
+                    'CNV': [
+                        {
+                            'CNV variant report': cnv_workbook_id,
+                            'CNV count': str(cnv_variant_count),
+                            'CNV calls for IGV': seg_id,
+                            'Session file name': cnv_file_ending
+                        }
+                    ]
+                }
+            }
         }
 
         return data
 
-    cnv_data = {}
+
+    cnv_data = defaultdict(
+        lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    )
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
         # submit jobs mapping each id to describe call
@@ -234,7 +354,26 @@ def get_cnv_file_ids(reports, gcnv_dict):
             # access returned output as each is returned in any order
             try:
                 data = future.result()
-                cnv_data[data['sample']] = data
+
+                # Get info from the returned dict (will only ever be one
+                # clinical indication / CNV file dict)
+                sample = data['sample']
+                clin_ind = list(data['clinical_indications'])[0]
+                cnv_info = data['clinical_indications'][clin_ind]['CNV'][0]
+
+                # If sample and clinical indication already exists, append CNV
+                # file info to existing list.
+                # If sample doesn't exist yet just add the data as is
+                cnv_data[sample]['sample'] = data['sample']
+                cnv_data[sample]['Alignment BAM'] = data['Alignment BAM']
+                cnv_data[sample]['Alignment BAI'] = data['Alignment BAI']
+                cnv_data[sample][
+                    'CNV visualisation'
+                ] = data['CNV visualisation']
+                cnv_data[sample][
+                    'clinical_indications'
+                ][clin_ind]['CNV'].append(cnv_info)
+
             except Exception as exc:
                 # catch any errors that might get raised during querying
                 print(f"Error getting data for {concurrent_jobs[future]}: {exc}")
@@ -374,13 +513,15 @@ def set_order_map(snv_only=False):
 
 
 def make_cnv_session(
-    sample, bam_url, bai_url, bed_url,
-    seg_url, excluded_url, targets_url, job_output, expiry_date):
+    sample, session_file_name, bam_url, bai_url, bed_url,
+    seg_url, excluded_url, targets_url, job_output, expiry_date
+):
     """ Create a session file for IGV
 
     Args:
         sessions_list (list): list of session files to upload in the end
         sample (string): sample name
+        session_file_name (string): str to add to end of session file name
         bam_url (string): URL of the bam file
         bai_url (string): URL of the bai file
         bed_url (string): URL of the bed file
@@ -431,8 +572,7 @@ def make_cnv_session(
 
         template_copy['tracks'].append(track)
 
-
-    output_name = f"{sample}_igv.json"
+    output_name = f"{sample}_{session_file_name}_igv.json"
 
     with open(output_name, "w") as outfile:
         json.dump(template_copy, outfile, indent=4)
@@ -473,12 +613,12 @@ def generate_sample_urls(
 
     Returns
     -------
-    dict
+    urls : dict
         dict of sample URLs
     """
     dx_project = os.environ.get("DX_PROJECT_CONTEXT_ID")
 
-    urls = {}
+    urls = defaultdict(lambda: defaultdict(dict))
     urls['sample'] = sample
 
     bam_url = make_url(sample_data['Alignment BAM'], dx_project, url_duration)
@@ -487,45 +627,118 @@ def generate_sample_urls(
     urls['bam_url'] = bam_url
     urls['bai_url'] = bai_url
 
-    if "SNV variant report" in sample_data:
-        coverage_url = make_url(
-            sample_data['Coverage report'], dx_project, url_duration)
-        snv_url = make_url(
-            sample_data['SNV variant report'], dx_project, url_duration)
+    # Loop over clinical indications
+    for clin_ind in sample_data['clinical_indications']:
+        snv_files = sample_data['clinical_indications'][clin_ind].get('SNV')
+        # If we have SNV reports, for each report make URLs and append to
+        # SNV value
+        if snv_files:
+            urls['clinical_indications'][clin_ind]['SNV'] = []
 
-        urls['coverage_url'] = (
-            f'=HYPERLINK("{coverage_url}", "{coverage_url}")'
-        )
-        urls['snv_url'] = f'=HYPERLINK("{snv_url}", "{snv_url}")'
+            for snv_file in snv_files:
+                coverage_url = make_url(
+                    snv_file['Coverage report'], dx_project, url_duration
+                )
+                snv_url = make_url(
+                    snv_file['SNV variant report'], dx_project, url_duration
+                )
 
-    if 'CNV variant report' in sample_data:
-        cnv_url = make_url(
-            sample_data['CNV variant report'], dx_project, url_duration)
+                urls['clinical_indications'][clin_ind]['SNV'].append(
+                    {
+                        'SNV count': snv_file['SNV count'],
+                        'coverage_url': (
+                            f'=HYPERLINK("{coverage_url}", "{coverage_url}")'
+                        ),
+                        'snv_url': f'=HYPERLINK("{snv_url}", "{snv_url}")'
+                    }
+                )
 
-        cnv_bed = make_url(
-            sample_data['CNV visualisation'], dx_project, url_duration)
-        cnv_seg = make_url(
-            sample_data['CNV calls for IGV'], dx_project, url_duration)
+        # If we have CNV reports, for each report make URLs/session files
+        # and append to CNV value
+        cnv_files = sample_data['clinical_indications'][clin_ind].get('CNV')
+        if cnv_files:
+            cnv_bed = make_url(
+                sample_data['CNV visualisation'], dx_project, url_duration
+            )
+            urls['clinical_indications'][clin_ind]['CNV'] = []
 
-        cnv_session = make_cnv_session(
-            sample, bam_url, bai_url, cnv_bed, cnv_seg, ex_intervals_url,
-            bed_url, job_output, expiry_date)
+            for cnv_file in cnv_files:
+                session_file_end = cnv_file['Session file name']
+                cnv_url = make_url(
+                    cnv_file['CNV variant report'], dx_project, url_duration
+                )
+                cnv_seg = make_url(
+                    cnv_file['CNV calls for IGV'], dx_project, url_duration
+                )
 
-        cnv_session_url = make_url(cnv_session, dx_project, url_duration)
+                cnv_session = make_cnv_session(
+                    sample, session_file_end, bam_url, bai_url, cnv_bed,
+                    cnv_seg, ex_intervals_url, bed_url, job_output,
+                    expiry_date
+                )
 
-        urls['cnv_bed'] = cnv_bed
-        urls['cnv_seg'] = cnv_seg
-        urls['cnv_session_fileid'] = cnv_session
-        urls['cnv_url'] = f'=HYPERLINK("{cnv_url}", "{cnv_url}")'
-        urls['cnv_session_url'] = (
-            f'=HYPERLINK("{cnv_session_url}", "{cnv_session_url}")'
-        )
+                cnv_session_url = make_url(
+                    cnv_session, dx_project, url_duration
+                )
+
+                urls['clinical_indications'][clin_ind]['CNV'].append({
+                    'CNV count': cnv_file['CNV count'],
+                    'cnv_bed': cnv_bed,
+                    'cnv_seg': cnv_seg,
+                    'cnv_session_fileid': cnv_session,
+                    'cnv_url': f'=HYPERLINK("{cnv_url}", "{cnv_url}")',
+                    'cnv_session_url': (
+                        f'=HYPERLINK("{cnv_session_url}", "{cnv_session_url}")'
+                    )
+                })
 
     return urls
 
 
+def remove_url_if_variant_count_is_zero(all_sample_urls):
+    """
+    Remove links to download Excel reports if there are no variants
+
+    Parameters
+    ----------
+    all_sample_urls : dict
+        generated URLs and file metadata for each sample
+
+    Returns
+    -------
+    all_sample_urls: dict
+        generated URLs and file metadata for each sample with Excel
+        download URLs removed when no variants are present
+    """
+    for sample, sample_data in all_sample_urls.items():
+        for clin_ind in sample_data['clinical_indications']:
+            file_data = sample_data['clinical_indications'][clin_ind]
+
+            # Replace SNV report URL with text if variant count is zero.
+            # If variant count was never present then replace with
+            # None so we can easily not include this field in final .xlsx
+            if 'SNV' in file_data:
+                for file in file_data['SNV']:
+                    if file.get('SNV count') == '0':
+                        file['snv_url'] = 'No SNVs post-filtering'
+                    elif file.get('SNV count') == 'Unknown':
+                        file['SNV count'] = None
+
+            # Do same for CNVs
+            if 'CNV' in file_data:
+                for file in file_data['CNV']:
+                    if file.get('CNV count') == '0':
+                        file['cnv_url'] = 'No CNVs detected'
+                    elif file.get('CNV count') == 'Unknown':
+                        file['CNV count'] = None
+
+    return all_sample_urls
+
+
 def write_output_file(
-    sample_urls, today, expiry_date, multiqc_url, qc_url, project_name):
+    sample_urls, today, expiry_date, multiqc_url, qc_url, project_name,
+    lock_cells
+):
     """
     Writes output xlsx file with all download URLs
 
@@ -541,6 +754,10 @@ def write_output_file(
         download URL for multiQC report
     qc_url : str
         download URL for QC report
+    project_name: str
+        DNAnexus project name
+    lock_cells : boolean
+        determines whether to lock any populated cells for editing
 
     Outputs
     -------
@@ -548,12 +765,18 @@ def write_output_file(
     """
     print("Writing output file")
 
+    sample_count = str(len(sample_urls.keys()))
+
     multiqc_url = f'=HYPERLINK("{multiqc_url}", "{multiqc_url}")'
     if qc_url.startswith('http'):
         qc_url = f'=HYPERLINK("{qc_url}", "{qc_url}")'
 
     df = pd.DataFrame(columns=['a', 'b'])
     df = df.append({'a': 'Run:', 'b': project_name}, ignore_index=True)
+    df = df.append(
+        {'a': 'Number of samples in this file:', 'b': sample_count},
+        ignore_index=True
+    )
     df = df.append({}, ignore_index=True)
     df = df.append({'a': 'Date Created:', 'b': today}, ignore_index=True)
     df = df.append({'a': 'Expiry Date:', 'b': expiry_date}, ignore_index=True)
@@ -573,16 +796,47 @@ def write_output_file(
 
         df = df.append({'a': sample}, ignore_index=True)
 
-        url_fields = {
-            'coverage_url': 'Coverage report:',
-            'snv_url': 'Small variant report',
-            'cnv_url': 'CNV variant report',
-            'cnv_session_url': 'CNV IGV Session:',
+        # Fields we need once per sample
+        sample_level_urls = {
             'bam_url': 'Alignment BAM',
             'bai_url': 'Alignment BAI'
         }
 
-        for field, label in url_fields.items():
+        # Fields we need once per report
+        url_fields = {
+            'coverage_url': 'Coverage report',
+            'SNV count': 'SNV count post-filtering',
+            'snv_url': 'Small variant report',
+            'CNV count': 'CNV count',
+            'cnv_url': 'CNV variant report',
+            'cnv_session_url': 'CNV IGV Session'
+        }
+
+        for clinical_indication in urls['clinical_indications']:
+            file_data = urls['clinical_indications'][clinical_indication]
+
+            # If we know clinical indication add this as a header
+            if clinical_indication != 'Unknown':
+                df = df.append({'a': clinical_indication}, ignore_index=True)
+
+            # Add fields for any SNV files first for that clinical indication
+            for field, label in url_fields.items():
+                for snv_data in file_data.get('SNV', {}):
+                    if snv_data.get(field):
+                        df = df.append(
+                            {'a': label, 'b': snv_data.get(field)},
+                            ignore_index=True
+                        )
+
+                # Then add fields for CNV fields for that clinical indication
+                for cnv_data in file_data.get('CNV', {}):
+                    if cnv_data.get(field):
+                        df = df.append(
+                            {'a': label, 'b': cnv_data.get(field)},
+                            ignore_index=True
+                        )
+        # Add BAM and BAI URLs for the sample
+        for field, label in sample_level_urls.items():
             if urls.get(field):
                 if field == 'bam_url':
                     df = df.append({}, ignore_index=True)
@@ -600,27 +854,59 @@ def write_output_file(
 
     # set column widths
     sheet = writer.sheets['Sheet1']
-    sheet.column_dimensions['A'].width = 20
-    sheet.column_dimensions['B'].width = 145
+    sheet.column_dimensions['A'].width = 55
+    sheet.column_dimensions['B'].width = 155
 
     sheet['A1'].font = Font(bold=True, name=DEFAULT_FONT.name)
-    sheet['A6'].font = Font(bold=True, name=DEFAULT_FONT.name)
-    sheet['A11'].font = Font(bold=True, name=DEFAULT_FONT.name)
+    sheet['A2'].font = Font(bold=True, name=DEFAULT_FONT.name)
+    sheet['A7'].font = Font(bold=True, name=DEFAULT_FONT.name)
+    sheet['A12'].font = Font(bold=True, name=DEFAULT_FONT.name)
 
-    # make sample IDs bold
+    # If lock_cells=True we're protecting populated cells from editing
+    # openpyxl is silly and you need to lock a whole sheet then unlock
+    # specific cells - so to do the opposite we unlock the first 3000 rows
+    # and 100 columns (assuming max 20 rows / sample and 96 samples per run).
+    # Also set format so that we can still resize rows/columns if protected
+    if lock_cells:
+        print("lock_cells=True, locking any populated Excel cells")
+        sheet.protection.sheet = True
+        sheet.protection.formatColumns = False
+        sheet.protection.formatRows = False
+        sheet.protection.formatCells = False
+
+        for row_no in range(1, 3000):
+            for col_no in range(1, 100):
+                sheet.cell(row=row_no, column=col_no).protection = Protection(
+                    locked=False
+                )
+    else:
+        print("lock_cells=False, all Excel cells will be editable")
+
+    # Make sample IDs and any clinical indication names bold
+    # Lock any cells in column A for editing if they're populated
     for cell in sheet.iter_rows(max_col=1):
-        if re.match(r'X[\d]+', cell[0].value):
-            sheet[cell[0].coordinate].font = Font(
-                bold=True, name=DEFAULT_FONT.name)
-        elif re.match(r'[a-zA-Z0-9]+-[a-zA-Z0-9]+-[a-zA-Z0-9]+-[a-zA-Z0-9]+-[MFU]-[a-zA-Z0-9]+', cell[0].value):
-            sheet[cell[0].coordinate].font = Font(
-                bold=True, name=DEFAULT_FONT.name)
+        if cell[0].value:
+            if re.match(r'X[\d]+', cell[0].value):
+                sheet[cell[0].coordinate].font = Font(
+                    bold=True, name=DEFAULT_FONT.name)
+            elif re.match(r'[a-zA-Z0-9]+-[a-zA-Z0-9]+-[a-zA-Z0-9]+-[a-zA-Z0-9]+-[MFU]-[a-zA-Z0-9]+', cell[0].value):
+                sheet[cell[0].coordinate].font = Font(
+                    bold=True, name=DEFAULT_FONT.name)
+            elif re.match(r'[RC][\d]+\.[\d]+|_HGNC:[\d]+', cell[0].value):
+                sheet[cell[0].coordinate].font = Font(
+                    bold=True, name=DEFAULT_FONT.name)
+            if lock_cells:
+                cell[0].protection = Protection(locked=True)
 
     # make hyperlinks blue
+    # Lock any cells in column B for editing if they're populated'
     for cell in sheet.iter_rows(min_col=2, max_col=2):
-        if 'HYPERLINK' in str(cell[0].value):
-            sheet[cell[0].coordinate].font = Font(
-                color='00007f', name=DEFAULT_FONT.name)
+        if cell[0].value:
+            if 'HYPERLINK' in str(cell[0].value):
+                sheet[cell[0].coordinate].font = Font(
+                    color='00007f', name=DEFAULT_FONT.name)
+            if lock_cells:
+                cell[0].protection = Protection(locked=True)
 
     writer.book.save(f'{project_name}_{today}.xlsx')
 
@@ -628,7 +914,10 @@ def write_output_file(
 
 
 @dxpy.entry_point('main')
-def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=None):
+def main(
+    url_duration, lock_cells=True, snv_path=None, cnv_path=None,
+    bed_file=None, qc_status=None, multiqc_report=None
+):
 
     # Set up logging
     logger = logging.getLogger(__name__)
@@ -659,7 +948,6 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
     project_name = '_'.join(project_name.split('_')[1:-1])
 
     # Gather required SNV files if SNV path is provided
-    multiqc = None
     if snv_path:
         logger.info("Gathering Small variant files")
 
@@ -680,12 +968,19 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
 
         print(f"Size of snv data dict: {len(snv_data.keys())}")
 
-        # Get multiqc report
-        multiqc = get_multiqc_report(snv_path.split(',')[0], DX_PROJECT)
+        # If multiqc report not given, search for multiqc report
+        if not multiqc_report:
+            print(
+                "No MultiQC report given, searching instead "
+                f"with path {snv_path}"
+            )
+            multiqc_report = get_multiqc_report(
+                snv_path.split(',')[0], DX_PROJECT
+            )
 
     # Gather required CNV files if CNV path is provided
     if cnv_path:
-        logger.info("Gathering CNV  files")
+        logger.info("Gathering CNV files")
 
         # Create folder for session files
         dxpy.api.project_new_folder(
@@ -717,9 +1012,15 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
 
         print(f"Size of cnv data dict: {len(cnv_data.keys())}")
 
-        # Get multiqc report
-        if not multiqc:
-            multiqc = get_multiqc_report(cnv_path.split(',')[0], DX_PROJECT)
+        # If multiqc report not given or found earlier, search for it
+        if not multiqc_report:
+            print(
+                "No MultiQC report given, searching instead "
+                f"with path {cnv_path}"
+            )
+            multiqc_report = get_multiqc_report(
+                cnv_path.split(',')[0], DX_PROJECT
+            )
     else:
         ex_intervals_url = ''
 
@@ -739,14 +1040,14 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
     else:
         qc_status_url = 'No QC status file provided'
 
-    data = {}
+    file_data = {}
 
     if snv_path and cnv_path:
-        merge(data, snv_data, cnv_data)
+        merge(file_data, snv_data, cnv_data)
     elif snv_path:
-        data = snv_data
+        file_data = snv_data
     elif cnv_path:
-        data = cnv_data
+        file_data = cnv_data
     else:
         logger.debug("No paths given, exiting...")
         exit(1)
@@ -769,7 +1070,7 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
             executor.submit(
                 generate_sample_urls, sample, sample_data, url_duration,
                 ex_intervals_url, bed_file_url, expiry_date, job_output
-            ) for sample, sample_data in data.items()
+            ) for sample, sample_data in file_data.items()
         }
 
         for future in concurrent.futures.as_completed(concurrent_jobs):
@@ -781,11 +1082,14 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
                 # catch any errors that might get raised during querying
                 print(f"Error getting data for {concurrent_jobs[future]}: {exc}")
 
-    multiqc_url = make_url(multiqc, DX_PROJECT, url_duration)
+    multiqc_url = make_url(multiqc_report, DX_PROJECT, url_duration)
+
+    # Remove download URLs for reports with no variants in
+    all_sample_urls = remove_url_if_variant_count_is_zero(all_sample_urls)
 
     write_output_file(
         all_sample_urls, today, expiry_date, multiqc_url,
-        qc_status_url, project_name
+        qc_status_url, project_name, lock_cells
     )
 
     # Upload output to the platform
@@ -797,10 +1101,42 @@ def main(url_duration, snv_path=None, cnv_path=None, bed_file=None, qc_status=No
     )
     output["url_file"] = dxpy.dxlink(url_file)
 
-    session_files = [
-        x.get('cnv_session_fileid') for x in all_sample_urls.values()
-        if x.get('cnv_session_fileid')
-    ]
+    # Find session files to link to output
+    """
+    Example all_sample_urls format we're looping over:
+    'sample-name': {
+        'sample': 'sample-name',
+        'bam_url': 'url_for_bam',
+        'bai_url':  'url_for_bai',
+        'clinical_indications': {
+            'R141.1': {
+                'SNV': [{
+                    'SNV count': '7',
+                    'coverage_url: '=HYPERLINK("hyperlink", "hyperlink"),
+                    'snv_url': '=HYPERLINK("hyperlink", "hyperlink"),
+                }],
+                'CNV': [{
+                    'CNV count': '1',
+                    'cnv_bed': 'bed_url',
+                    'cnv_seg': 'seg_url',
+                    'cnv_session_fileid': 'file-XYZ',
+                    'cnv_url': '=HYPERLINK("hyperlink", "hyperlink"),
+                    'cnv_session_url': '=HYPERLINK("hyperlink", "hyperlink")
+                }]
+            }
+        }
+    }
+    """
+    session_files = []
+    for sample, sample_info in all_sample_urls.items():
+        for clin_ind in sample_info.get('clinical_indications'):
+            if sample_info['clinical_indications'][clin_ind].get('CNV'):
+                for cnv_item in (
+                    sample_info['clinical_indications'][clin_ind]['CNV']
+                ):
+                    session_file_id = cnv_item['cnv_session_fileid']
+                    session_files.append(session_file_id)
+
     print(f"Found {len(session_files)} session files to link to job output")
     if session_files:
         output["session_files"] = [dxpy.dxlink(item) for item in session_files]
