@@ -720,26 +720,28 @@ def remove_url_if_variant_count_is_zero(
         for clin_ind in sample_data['clinical_indications']:
             file_data = sample_data['clinical_indications'][clin_ind]
 
+            # If variant count was never present then replace with None
+            # so we can easily not include this field in final .xlsx
             # If snv_reports option True, replace SNV report URL with text
-            # if variant count is zero. If variant count was never present
-            # then replace with None so we can easily not include this field
-            # in final .xlsx
-            if snv_reports:
-                if 'SNV' in file_data:
-                    for file in file_data['SNV']:
+            # if variant count is zero.
+            if 'SNV' in file_data:
+                for file in file_data['SNV']:
+                    if file.get('SNV count') == 'Unknown':
+                        file['SNV count'] = None
+                    if snv_reports:
                         if file.get('SNV count') == '0':
                             file['snv_url'] = 'No SNVs post-filtering'
-                        elif file.get('SNV count') == 'Unknown':
-                            file['SNV count'] = None
 
-            # If cnv_reports option True, do same for CNV report links
-            if cnv_reports:
-                if 'CNV' in file_data:
-                    for file in file_data['CNV']:
+            # Do same for CNV reports, remove CNV report link if
+            # cnv_reports option True
+            if 'CNV' in file_data:
+                for file in file_data['CNV']:
+                    if file.get('CNV count') == 'Unknown':
+                        file['CNV count'] = None
+                    if cnv_reports:
                         if file.get('CNV count') == '0':
                             file['cnv_url'] = 'No CNVs detected'
-                        elif file.get('CNV count') == 'Unknown':
-                            file['CNV count'] = None
+
 
     return all_sample_urls
 
