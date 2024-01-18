@@ -697,7 +697,7 @@ def generate_sample_urls(
 
 def remove_url_if_variant_count_is_zero(
         all_sample_urls, snv_reports, cnv_reports
-    ):
+):
     """
     Remove links to download Excel reports if there are no variants
 
