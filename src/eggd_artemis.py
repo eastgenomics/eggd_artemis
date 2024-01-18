@@ -695,7 +695,9 @@ def generate_sample_urls(
     return urls
 
 
-def remove_url_if_variant_count_is_zero(all_sample_urls):
+def remove_url_if_variant_count_is_zero(
+        all_sample_urls, snv_reports, cnv_reports
+):
     """
     Remove links to download Excel reports if there are no variants
 
@@ -703,6 +705,10 @@ def remove_url_if_variant_count_is_zero(all_sample_urls):
     ----------
     all_sample_urls : dict
         generated URLs and file metadata for each sample
+    snv_reports : boolean
+        if True, SNV report links will be removed if no SNVs pass filtering
+    cnv_reports : boolean
+        if True, CNV report links will be removed if no CNVs detected
 
     Returns
     -------
@@ -714,23 +720,26 @@ def remove_url_if_variant_count_is_zero(all_sample_urls):
         for clin_ind in sample_data['clinical_indications']:
             file_data = sample_data['clinical_indications'][clin_ind]
 
-            # Replace SNV report URL with text if variant count is zero.
-            # If variant count was never present then replace with
-            # None so we can easily not include this field in final .xlsx
-            if 'SNV' in file_data:
-                for file in file_data['SNV']:
-                    if file.get('SNV count') == '0':
-                        file['snv_url'] = 'No SNVs post-filtering'
-                    elif file.get('SNV count') == 'Unknown':
-                        file['SNV count'] = None
+            # If snv_reports option True, replace SNV report URL with text
+            # if variant count is zero. If variant count was never present
+            # then replace with None so we can easily not include this field
+            # in final .xlsx
+            if snv_reports:
+                if 'SNV' in file_data:
+                    for file in file_data['SNV']:
+                        if file.get('SNV count') == '0':
+                            file['snv_url'] = 'No SNVs post-filtering'
+                        elif file.get('SNV count') == 'Unknown':
+                            file['SNV count'] = None
 
-            # Do same for CNVs
-            if 'CNV' in file_data:
-                for file in file_data['CNV']:
-                    if file.get('CNV count') == '0':
-                        file['cnv_url'] = 'No CNVs detected'
-                    elif file.get('CNV count') == 'Unknown':
-                        file['CNV count'] = None
+            # If cnv_reports option True, do same for CNV report links
+            if cnv_reports:
+                if 'CNV' in file_data:
+                    for file in file_data['CNV']:
+                        if file.get('CNV count') == '0':
+                            file['cnv_url'] = 'No CNVs detected'
+                        elif file.get('CNV count') == 'Unknown':
+                            file['CNV count'] = None
 
     return all_sample_urls
 
@@ -1085,7 +1094,9 @@ def main(
     multiqc_url = make_url(multiqc_report, DX_PROJECT, url_duration)
 
     # Remove download URLs for reports with no variants in
-    all_sample_urls = remove_url_if_variant_count_is_zero(all_sample_urls)
+    all_sample_urls = remove_url_if_variant_count_is_zero(
+        all_sample_urls, snv_reports=True, cnv_reports=False
+    )
 
     write_output_file(
         all_sample_urls, today, expiry_date, multiqc_url,
