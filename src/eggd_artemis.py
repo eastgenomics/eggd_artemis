@@ -253,6 +253,7 @@ def get_cnv_file_ids(reports, gcnv_dict):
                             'CNV variant report': 'file-OP',
                             'CNV calls for IGV': {'$dnanexus_link': 'file-LM'},
                             'CNV count': 0,
+                            'CNV excluded regions': 'file-AB',
                             'Session file name': 'R208.1_CNV_1'
                         }
                     ]
@@ -289,6 +290,9 @@ def get_cnv_file_ids(reports, gcnv_dict):
         cnv_variant_count = file_details.get('variants', 'Unknown')
 
         gen_xlsx_job = report["describe"]["createdBy"]["job"]
+
+        excluded_regions_id = dxpy.bindings.dxjob.DXJob(
+            dxid=gen_xlsx_job).describe()["input"]["additional_files"][0]["$dnanexus_link"]
 
         # Find the reports workflow analysis id
         reports_analysis = dxpy.bindings.dxjob.DXJob(
@@ -329,6 +333,7 @@ def get_cnv_file_ids(reports, gcnv_dict):
                         {
                             'CNV variant report': cnv_workbook_id,
                             'CNV count': str(cnv_variant_count),
+                            'CNV excluded regions': excluded_regions_id,
                             'CNV calls for IGV': seg_id,
                             'Session file name': cnv_file_ending
                         }
@@ -336,7 +341,7 @@ def get_cnv_file_ids(reports, gcnv_dict):
                 }
             }
         }
-
+        print(data)
         return data
 
 
@@ -670,7 +675,6 @@ def generate_sample_urls(
                 cnv_seg = make_url(
                     cnv_file['CNV calls for IGV'], dx_project, url_duration
                 )
-
                 cnv_session = make_cnv_session(
                     sample, session_file_end, bam_url, bai_url, cnv_bed,
                     cnv_seg, ex_intervals_url, bed_url, job_output,
@@ -741,7 +745,6 @@ def remove_url_if_variant_count_is_zero(
                     if cnv_reports:
                         if file.get('CNV count') == '0':
                             file['cnv_url'] = 'No CNVs detected'
-
 
     return all_sample_urls
 
@@ -859,7 +862,6 @@ def write_output_file(
         df = df.append({}, ignore_index=True)
         df = df.append({}, ignore_index=True)
 
-
     writer = pd.ExcelWriter(f'{project_name}_{today}.xlsx', engine='openpyxl')
     df.to_excel(writer, index=False, header=False)
 
@@ -928,7 +930,7 @@ def write_output_file(
 def main(
     url_duration, lock_cells=True, snv_path=None, cnv_path=None,
     bed_file=None, qc_status=None, multiqc_report=None
-):
+    ):
 
     # Set up logging
     logger = logging.getLogger(__name__)
@@ -1063,13 +1065,11 @@ def main(
         logger.debug("No paths given, exiting...")
         exit(1)
 
-
     today = datetime.datetime.now().strftime("%Y-%m-%d")
     expiry_date=(
         datetime.datetime.strptime(datetime.datetime.now().strftime('%Y-%m-%d'),
         '%Y-%m-%d') + datetime.timedelta(seconds=url_duration)
     ).strftime('%Y-%m-%d')
-
 
     # generate all urls for each sample
     logger.info("Generating per sample URLs")
