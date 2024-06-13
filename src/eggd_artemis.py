@@ -929,7 +929,7 @@ def write_output_file(
 def main(
     url_duration, lock_cells=True, snv_path=None, cnv_path=None,
     bed_file=None, qc_status=None, multiqc_report=None
-    ):
+):
 
     # Set up logging
     logger = logging.getLogger(__name__)
