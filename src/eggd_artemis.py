@@ -341,7 +341,6 @@ def get_cnv_file_ids(reports, gcnv_dict):
                 }
             }
         }
-        print(data)
         return data
 
 
