@@ -739,7 +739,7 @@ def generate_sample_outputs(
     return outputs
 
 
-def remove_unecessary_outputs(
+def remove_unnecessary_outputs(
         all_sample_outputs, snv_reports, cnv_reports
 ):
     """
@@ -787,7 +787,7 @@ def remove_unecessary_outputs(
                     if cnv_reports:
                         if file.get('CNV count') == '0':
                             file['cnv_url'] = 'No CNVs detected'
-                    if len(file.get('cnv_excluded_regions_df')) == 0:
+                    if file.get('cnv_excluded_regions_df').empty:
                         file['cnv_excluded_regions_df'] = 'No CNV excluded regions'
     return all_sample_outputs
 
@@ -1139,8 +1139,8 @@ def main(
     multiqc_url = make_url(multiqc_report, DX_PROJECT, url_duration)
 
     # Remove download URLs for reports with no variants in and remove
-    # excluded regions dataframe if no excldued regions
-    all_sample_outputs = remove_unecessary_outputs(
+    # excluded regions dataframe if no excluded regions
+    all_sample_outputs = remove_unnecessary_outputs(
         all_sample_outputs, snv_reports=True, cnv_reports=True
     )
 
@@ -1178,7 +1178,8 @@ def main(
                     'cnv_seg': 'seg_url',
                     'cnv_session_fileid': 'file-XYZ',
                     'cnv_url': '=HYPERLINK("hyperlink", "hyperlink"),
-                    'cnv_session_url': '=HYPERLINK("hyperlink", "hyperlink")
+                    'cnv_session_url': '=HYPERLINK("hyperlink", "hyperlink"),
+                    'cnv_excluded_regions_df': pd.DataFrame of excluded regions file
                 }]
             }
         }
