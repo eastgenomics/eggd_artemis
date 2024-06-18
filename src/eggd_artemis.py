@@ -244,6 +244,7 @@ def get_cnv_file_ids(reports, gcnv_dict):
                             'CNV variant report': 'file-ZX',
                             'CNV calls for IGV': {'$dnanexus_link': 'file-TU'},
                             'CNV count': 0,
+                            'CNV excluded regions': 'file-CD',
                             'Session file name': 'R414.1_CNV_1'
                         }
                     ],
@@ -592,9 +593,45 @@ def make_cnv_session(
     return session_file_id
 
 
-def generate_sample_urls(
-    sample, sample_data, url_duration, ex_intervals_url,
-    bed_url, expiry_date, job_output) -> dict:
+def read_excluded_regions_to_df(file_id, project):
+    """
+    Read in excluded regions file to a pandas dataframe.
+
+    Args:
+        file_id (str): DNA nexus file ID of excluded regions file.
+        project (str): DNA nexus project ID of file.
+
+    Raises:
+        AssertionError if not all required file headers are present in the
+          resulting dataframe.
+
+    Returns:
+        pd.DataFrame: file read in as pandas dataframe.
+    """
+    required_headers = [
+        "Chrom", "Start", "End", "Length", "Gene_Symbol", "HGNC_ID",
+        "Transcript", "Exon"
+    ]
+
+    file = dxpy.open_dxfile(
+        file_id,
+        project=project,
+        mode="r",
+    )
+
+    df = pd.read_csv(file, sep="\t", header=0)
+
+    assert all([header in df.columns for header in required_headers]), (
+            f"{file_id} doesn't have all the required headers"
+        )
+
+    return df
+
+
+def generate_sample_outputs(
+    sample, sample_data, url_duration, ex_intervals_url, bed_url, expiry_date,
+    job_output
+) -> dict:
     """
     Generates all URLs and session file for a given sample
 
@@ -617,19 +654,19 @@ def generate_sample_urls(
 
     Returns
     -------
-    urls : dict
-        dict of sample URLs
+    outputs : dict
+        dict of sample outputs (i.e. URLs/dataframes)
     """
     dx_project = os.environ.get("DX_PROJECT_CONTEXT_ID")
 
-    urls = defaultdict(lambda: defaultdict(dict))
-    urls['sample'] = sample
+    outputs = defaultdict(lambda: defaultdict(dict))
+    outputs['sample'] = sample
 
     bam_url = make_url(sample_data['Alignment BAM'], dx_project, url_duration)
     bai_url = make_url(sample_data['Alignment BAI'], dx_project, url_duration)
 
-    urls['bam_url'] = bam_url
-    urls['bai_url'] = bai_url
+    outputs['bam_url'] = bam_url
+    outputs['bai_url'] = bai_url
 
     # Loop over clinical indications
     for clin_ind in sample_data['clinical_indications']:
@@ -637,7 +674,7 @@ def generate_sample_urls(
         # If we have SNV reports, for each report make URLs and append to
         # SNV value
         if snv_files:
-            urls['clinical_indications'][clin_ind]['SNV'] = []
+            outputs['clinical_indications'][clin_ind]['SNV'] = []
 
             for snv_file in snv_files:
                 coverage_url = make_url(
@@ -647,7 +684,7 @@ def generate_sample_urls(
                     snv_file['SNV variant report'], dx_project, url_duration
                 )
 
-                urls['clinical_indications'][clin_ind]['SNV'].append(
+                outputs['clinical_indications'][clin_ind]['SNV'].append(
                     {
                         'SNV count': snv_file['SNV count'],
                         'coverage_url': (
@@ -664,7 +701,7 @@ def generate_sample_urls(
             cnv_bed = make_url(
                 sample_data['CNV visualisation'], dx_project, url_duration
             )
-            urls['clinical_indications'][clin_ind]['CNV'] = []
+            outputs['clinical_indications'][clin_ind]['CNV'] = []
 
             for cnv_file in cnv_files:
                 session_file_end = cnv_file['Session file name']
@@ -679,12 +716,15 @@ def generate_sample_urls(
                     cnv_seg, ex_intervals_url, bed_url, job_output,
                     expiry_date
                 )
-
                 cnv_session_url = make_url(
                     cnv_session, dx_project, url_duration
                 )
+                cnv_excluded_regions_df = read_excluded_regions_to_df(
+                    file_id=cnv_file['CNV excluded regions'],
+                    project=dx_project
+                )
 
-                urls['clinical_indications'][clin_ind]['CNV'].append({
+                outputs['clinical_indications'][clin_ind]['CNV'].append({
                     'CNV count': cnv_file['CNV count'],
                     'cnv_bed': cnv_bed,
                     'cnv_seg': cnv_seg,
@@ -692,22 +732,24 @@ def generate_sample_urls(
                     'cnv_url': f'=HYPERLINK("{cnv_url}", "{cnv_url}")',
                     'cnv_session_url': (
                         f'=HYPERLINK("{cnv_session_url}", "{cnv_session_url}")'
-                    )
+                    ),
+                    'cnv_excluded_regions_df': cnv_excluded_regions_df
                 })
 
-    return urls
+    return outputs
 
 
-def remove_url_if_variant_count_is_zero(
-        all_sample_urls, snv_reports, cnv_reports
+def remove_unnecessary_outputs(
+        all_sample_outputs, snv_reports, cnv_reports
 ):
     """
-    Remove links to download Excel reports if there are no variants
+    Remove links to download Excel reports if there are no variants and remove
+    excluded regions dataframe if there are no excluded regions
 
     Parameters
     ----------
-    all_sample_urls : dict
-        generated URLs and file metadata for each sample
+    all_sample_outputs : dict
+        generated URLs, dataframes and file metadata for each sample
     snv_reports : boolean
         if True, SNV report links will be removed if no SNVs pass filtering
     cnv_reports : boolean
@@ -715,11 +757,12 @@ def remove_url_if_variant_count_is_zero(
 
     Returns
     -------
-    all_sample_urls: dict
-        generated URLs and file metadata for each sample with Excel
-        download URLs removed when no variants are present
+    all_sample_outputs: dict
+        generated URLs, dataframes and file metadata for each sample with Excel
+          download URLs removed when no variants are present and excluded
+          region dataframe removed when there are no excluded regions.
     """
-    for sample, sample_data in all_sample_urls.items():
+    for sample, sample_data in all_sample_outputs.items():
         for clin_ind in sample_data['clinical_indications']:
             file_data = sample_data['clinical_indications'][clin_ind]
 
@@ -744,8 +787,9 @@ def remove_url_if_variant_count_is_zero(
                     if cnv_reports:
                         if file.get('CNV count') == '0':
                             file['cnv_url'] = 'No CNVs detected'
-
-    return all_sample_urls
+                    if file.get('cnv_excluded_regions_df').empty:
+                        file['cnv_excluded_regions_df'] = 'No CNV excluded regions'
+    return all_sample_outputs
 
 
 def write_output_file(
@@ -1065,20 +1109,20 @@ def main(
         exit(1)
 
     today = datetime.datetime.now().strftime("%Y-%m-%d")
-    expiry_date=(
+    expiry_date = (
         datetime.datetime.strptime(datetime.datetime.now().strftime('%Y-%m-%d'),
         '%Y-%m-%d') + datetime.timedelta(seconds=url_duration)
     ).strftime('%Y-%m-%d')
 
     # generate all urls for each sample
     logger.info("Generating per sample URLs")
-    all_sample_urls = {}
+    all_sample_outputs = {}
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
         # submit jobs mapping each id to describe call
         concurrent_jobs = {
             executor.submit(
-                generate_sample_urls, sample, sample_data, url_duration,
+                generate_sample_outputs, sample, sample_data, url_duration,
                 ex_intervals_url, bed_file_url, expiry_date, job_output
             ) for sample, sample_data in file_data.items()
         }
@@ -1087,20 +1131,21 @@ def main(
             # access returned output as each is returned in any order
             try:
                 data = future.result()
-                all_sample_urls[data['sample']] = data
+                all_sample_outputs[data['sample']] = data
             except Exception as exc:
                 # catch any errors that might get raised during querying
                 print(f"Error getting data for {concurrent_jobs[future]}: {exc}")
 
     multiqc_url = make_url(multiqc_report, DX_PROJECT, url_duration)
 
-    # Remove download URLs for reports with no variants in
-    all_sample_urls = remove_url_if_variant_count_is_zero(
-        all_sample_urls, snv_reports=True, cnv_reports=False
+    # Remove download URLs for reports with no variants in and remove
+    # excluded regions dataframe if no excluded regions
+    all_sample_outputs = remove_unnecessary_outputs(
+        all_sample_outputs, snv_reports=True, cnv_reports=True
     )
 
     write_output_file(
-        all_sample_urls, today, expiry_date, multiqc_url,
+        all_sample_outputs, today, expiry_date, multiqc_url,
         qc_status_url, project_name, lock_cells
     )
 
@@ -1115,7 +1160,7 @@ def main(
 
     # Find session files to link to output
     """
-    Example all_sample_urls format we're looping over:
+    Example all_sample_outputs format we're looping over:
     'sample-name': {
         'sample': 'sample-name',
         'bam_url': 'url_for_bam',
@@ -1133,14 +1178,15 @@ def main(
                     'cnv_seg': 'seg_url',
                     'cnv_session_fileid': 'file-XYZ',
                     'cnv_url': '=HYPERLINK("hyperlink", "hyperlink"),
-                    'cnv_session_url': '=HYPERLINK("hyperlink", "hyperlink")
+                    'cnv_session_url': '=HYPERLINK("hyperlink", "hyperlink"),
+                    'cnv_excluded_regions_df': pd.DataFrame of excluded regions file
                 }]
             }
         }
     }
     """
     session_files = []
-    for sample, sample_info in all_sample_urls.items():
+    for sample, sample_info in all_sample_outputs.items():
         for clin_ind in sample_info.get('clinical_indications'):
             if sample_info['clinical_indications'][clin_ind].get('CNV'):
                 for cnv_item in (
@@ -1153,7 +1199,7 @@ def main(
     if session_files:
         output["session_files"] = [dxpy.dxlink(item) for item in session_files]
 
-
     return output
+
 
 dxpy.run()
