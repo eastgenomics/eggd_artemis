@@ -42,6 +42,7 @@ def find_snv_files(reports):
                         {
                             'SNV variant report': 'file-ZX',
                             'Coverage report': {'$dnanexus_link': 'file-GH'},
+                            'Summary text file': 'file-NM',
                             'SNV count': 1
                         }
                     ],
@@ -50,6 +51,7 @@ def find_snv_files(reports):
                         {
                             'SNV variant report': 'file-GH',
                             'Coverage report': {'$dnanexus_link': 'file-GH'},
+                            'Summary text file': 'file-JK',
                             'SNV count': 3
                         }
                     ]
@@ -97,9 +99,14 @@ def find_snv_files(reports):
             coverage_report = parent_details["output"]["stage-rpt_athena.report"]
         except KeyError:
             coverage_report = parent_details["output"]["stage-Fyq5z18433GfYZbp3vX1KqjB.report"]
+        try:
+            summary_text = parent_details["output"]["stage-rpt_athena.summary_text"]["$dnanexus_link"]
+        except KeyError:
+            print(f"No summary .txt file found in output of eggd_athena stage"
+                  f" for SNV reports workflow ({parent_details})")
 
         # Extract the sention job id from the vcf metadata
-        sention_job_id=dxpy.describe(vcf_file)["createdBy"]["job"]
+        sention_job_id = dxpy.describe(vcf_file)["createdBy"]["job"]
         sentieon_details = dxpy.bindings.dxjob.DXJob(dxid=sention_job_id).describe()
 
         # Get bam & bai job id from sention job metadata
@@ -117,6 +124,7 @@ def find_snv_files(reports):
                         {
                             "SNV variant report": report['describe']['id'],
                             "Coverage report": coverage_report,
+                            "Summary text file": summary_text,
                             "SNV count": str(snv_variant_count)
                         }
                     ]
@@ -411,10 +419,10 @@ def get_multiqc_report(path_to_reports, project):
         multiqc_file (str): file id of the multiqc file
     """
     # Get path to single from reports path
-    single=f"/output/{path_to_reports.split('/')[2]}"
+    single = f"/output/{path_to_reports.split('/')[2]}"
 
     # Find MultiQC jobs in the project
-    multiqc_reports=list(dxpy.bindings.search.find_jobs(
+    multiqc_reports = list(dxpy.bindings.search.find_jobs(
             name_mode='glob',
             name="*MultiQC*",
             state="done",
