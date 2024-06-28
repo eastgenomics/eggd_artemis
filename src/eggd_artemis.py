@@ -847,23 +847,21 @@ def write_output_file(
     if qc_url.startswith('http'):
         qc_url = f'=HYPERLINK("{qc_url}", "{qc_url}")'
 
-    df = pd.DataFrame(columns=['a', 'b'])
-    df = df.append({'a': 'Run:', 'b': project_name}, ignore_index=True)
-    df = df.append(
+    df = pd.DataFrame([
+        {'a': 'Run:', 'b': project_name},
         {'a': 'Number of samples in this file:', 'b': sample_count},
-        ignore_index=True
-    )
-    df = df.append({}, ignore_index=True)
-    df = df.append({'a': 'Date Created:', 'b': today}, ignore_index=True)
-    df = df.append({'a': 'Expiry Date:', 'b': expiry_date}, ignore_index=True)
-    df = df.append({}, ignore_index=True)
-    df = df.append({'a': 'Run Level Files'}, ignore_index=True)
-    df = df.append({'a': 'MultiQC report', 'b': multiqc_url}, ignore_index=True)
-    df = df.append({'a': 'QC Status Report', 'b': qc_url}, ignore_index=True)
-    df = df.append({}, ignore_index=True)
-    df = df.append({}, ignore_index=True)
-    df = df.append({'a': 'Per Sample Files'}, ignore_index=True)
-    df = df.append({}, ignore_index=True)
+        {},
+        {'a': 'Date Created:', 'b': today},
+        {'a': 'Expiry Date:', 'b': expiry_date},
+        {},
+        {'a': 'Run Level Files'},
+        {'a': 'MultiQC report', 'b': multiqc_url},
+        {'a': 'QC Status Report', 'b': qc_url},
+        {},
+        {},
+        {'a': 'Per Sample Files'},
+        {}
+    ])
 
     sample_order = sorted(sample_outputs.keys())
 
