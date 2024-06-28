@@ -692,12 +692,22 @@ def generate_sample_outputs(
                     snv_file['SNV variant report'], dx_project, url_duration
                 )
 
+                # Read in summary text file if file exists, else leave
+                # as None
+                if snv_file['Summary text file']:
+                    snv_file['Summary text file'] = dxpy.open_dxfile(
+                        snv_file['Summary text file'],
+                        project=dx_project,
+                        mode="r"
+                    ).read()
+
                 outputs['clinical_indications'][clin_ind]['SNV'].append(
                     {
                         'SNV count': snv_file['SNV count'],
                         'coverage_url': (
                             f'=HYPERLINK("{coverage_url}", "{coverage_url}")'
                         ),
+                        'coverage_summary': snv_file['Summary text file'],
                         'snv_url': f'=HYPERLINK("{snv_url}", "{snv_url}")'
                     }
                 )
