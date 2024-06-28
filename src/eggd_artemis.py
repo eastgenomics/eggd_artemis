@@ -699,7 +699,6 @@ def generate_sample_outputs(
                         'coverage_url': (
                             f'=HYPERLINK("{coverage_url}", "{coverage_url}")'
                         ),
-                        'coverage_summary': summary_text
                         'snv_url': f'=HYPERLINK("{snv_url}", "{snv_url}")'
                     }
                 )
