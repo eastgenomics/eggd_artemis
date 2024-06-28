@@ -102,7 +102,7 @@ def find_snv_files(reports):
         try:
             summary_text = parent_details["output"]["stage-rpt_athena.summary_text"]["$dnanexus_link"]
         except KeyError:
-            summary_text = ''
+            summary_text = None
             print(f"No summary .txt file found in output of eggd_athena stage"
                   f" for SNV reports workflow ({parent_details})")
 
@@ -692,12 +692,6 @@ def generate_sample_outputs(
                 snv_url = make_url(
                     snv_file['SNV variant report'], dx_project, url_duration
                 )
-                if
-                summary_text = dxpy.open_dxfile(
-                    snv_file['Summary text file'],
-                    project=dx_project,
-                    mode="r"
-                ).read()
 
                 outputs['clinical_indications'][clin_ind]['SNV'].append(
                     {
