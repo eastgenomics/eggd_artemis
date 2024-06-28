@@ -99,10 +99,9 @@ def find_snv_files(reports):
             coverage_report = parent_details["output"]["stage-rpt_athena.report"]
         except KeyError:
             coverage_report = parent_details["output"]["stage-Fyq5z18433GfYZbp3vX1KqjB.report"]
-        try:
-            summary_text = parent_details["output"]["stage-rpt_athena.summary_text"]["$dnanexus_link"]
-        except KeyError:
-            summary_text = None
+
+        summary_text = parent_details.get("output", {}).get("stage-rpt_athena.summary_text", {}).get("$dnanexus_link")
+        if not summary_text:
             print(f"No summary .txt file found in output of eggd_athena stage"
                   f" for SNV reports workflow ({parent_details})")
 
