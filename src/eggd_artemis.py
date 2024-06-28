@@ -811,7 +811,7 @@ def remove_unnecessary_outputs(
 
 
 def write_output_file(
-    sample_urls, today, expiry_date, multiqc_url, qc_url, project_name,
+    sample_outputs, today, expiry_date, multiqc_url, qc_url, project_name,
     lock_cells
 ):
     """
@@ -819,8 +819,8 @@ def write_output_file(
 
     Parameters
     ----------
-    sample_urls : dict
-        generated URLs for each sample
+    sample_outputs : dict
+        generated outputs (i.e. URLs, text and dataframes) for each sample
     today : str
         today date
     expiry_date : str
@@ -840,7 +840,7 @@ def write_output_file(
     """
     print("Writing output file")
 
-    sample_count = str(len(sample_urls.keys()))
+    sample_count = str(len(sample_outputs.keys()))
 
     multiqc_url = f'=HYPERLINK("{multiqc_url}", "{multiqc_url}")'
     if qc_url.startswith('http'):
@@ -864,10 +864,10 @@ def write_output_file(
     df = df.append({'a': 'Per Sample Files'}, ignore_index=True)
     df = df.append({}, ignore_index=True)
 
-    sample_order = sorted(sample_urls.keys())
+    sample_order = sorted(sample_outputs.keys())
 
     for sample in sample_order:
-        urls = sample_urls.get(sample)
+        outputs = sample_outputs.get(sample)
 
         df = df.append({'a': sample}, ignore_index=True)
 
@@ -878,8 +878,9 @@ def write_output_file(
         }
 
         # Fields we need once per report
-        url_fields = {
+        output_fields = {
             'coverage_url': 'Coverage report',
+            'coverage_summary': 'Coverage summary',
             'SNV count': 'SNV count post-filtering',
             'snv_url': 'Small variant report',
             'CNV count': 'CNV count',
@@ -887,15 +888,15 @@ def write_output_file(
             'cnv_session_url': 'CNV IGV Session'
         }
 
-        for clinical_indication in urls['clinical_indications']:
-            file_data = urls['clinical_indications'][clinical_indication]
+        for clinical_indication in outputs['clinical_indications']:
+            file_data = outputs['clinical_indications'][clinical_indication]
 
             # If we know clinical indication add this as a header
             if clinical_indication != 'Unknown':
                 df = df.append({'a': clinical_indication}, ignore_index=True)
 
             # Add fields for any SNV files first for that clinical indication
-            for field, label in url_fields.items():
+            for field, label in output_fields.items():
                 for snv_data in file_data.get('SNV', {}):
                     if snv_data.get(field):
                         df = df.append(
@@ -912,12 +913,12 @@ def write_output_file(
                         )
         # Add BAM and BAI URLs for the sample
         for field, label in sample_level_urls.items():
-            if urls.get(field):
+            if outputs.get(field):
                 if field == 'bam_url':
                     df = df.append({}, ignore_index=True)
 
                 df = df.append(
-                    {'a': label, 'b': urls.get(field)}, ignore_index=True
+                    {'a': label, 'b': outputs.get(field)}, ignore_index=True
                 )
 
         df = df.append({}, ignore_index=True)
@@ -1132,8 +1133,8 @@ def main(
         '%Y-%m-%d') + datetime.timedelta(seconds=url_duration)
     ).strftime('%Y-%m-%d')
 
-    # generate all urls for each sample
-    logger.info("Generating per sample URLs")
+    # generate all outputs for each sample
+    logger.info("Generating per sample outputs")
     all_sample_outputs = {}
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
@@ -1188,6 +1189,7 @@ def main(
                 'SNV': [{
                     'SNV count': '7',
                     'coverage_url: '=HYPERLINK("hyperlink", "hyperlink"),
+                    'coverage_summary' : 'coverage summary text',
                     'snv_url': '=HYPERLINK("hyperlink", "hyperlink"),
                 }],
                 'CNV': [{
