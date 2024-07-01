@@ -913,12 +913,21 @@ def write_output_file(
 
                 # Then add fields for CNV fields for that clinical indication
                 for cnv_data in file_data.get('CNV', {}):
-                    if cnv_data.get(field):
-                        if field == 'cnv_excluded_regions_df':
+                    # For excluded regions the output is always present but
+                    # could be text or a df which affects how it is added to
+                    # output df
+                    if field == 'cnv_excluded_regions_df':
+                        if cnv_data.get(field).isinstance(pd.DataFrame):
                             df = pd.concat(
                                 [df, cnv_data.get(field)], ignore_index=True
                             )
                         else:
+                            df = df.append(
+                                {'a': label, 'b': cnv_data.get(field)},
+                                ignore_index=True
+                            )
+                    else:
+                        if cnv_data.get(field):
                             df = df.append(
                                 {'a': label, 'b': cnv_data.get(field)},
                                 ignore_index=True
