@@ -917,14 +917,14 @@ def write_output_file(
                     # could be text or a df which affects how it is added to
                     # output df
                     if field == 'cnv_excluded_regions_df':
-                        if cnv_data.get(field).isinstance(pd.DataFrame):
-                            df = pd.concat(
-                                [df, cnv_data.get(field)], ignore_index=True
-                            )
-                        else:
+                        if cnv_data.get(field).isinstance(str):
                             df = df.append(
                                 {'a': label, 'b': cnv_data.get(field)},
                                 ignore_index=True
+                            )
+                        else:
+                            df = pd.concat(
+                                [df, cnv_data.get(field)], ignore_index=True
                             )
                     else:
                         if cnv_data.get(field):
