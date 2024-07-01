@@ -628,10 +628,11 @@ def read_excluded_regions_to_df(file_id, project):
         mode="r",
     )
 
-    # letters b -> i used as columns names to aid concatenation of this df when
+    # letters a -> i used as columns names to aid concatenation of this df when
     # forming the output df
     df = pd.read_csv(file, sep="\t", names=[
         'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'], header=None)
+    df.insert(0, 'a', ["CNV excluded regions:"] + [None] * (len(df) - 1))
 
     required_headers.sort()
     headers = df.iloc[0, :].tolist()
@@ -705,7 +706,7 @@ def generate_sample_outputs(
                         snv_file['Summary text file'],
                         project=dx_project,
                         mode="r"
-                    ).read()
+                    ).read().replace("Clinical report summary:\n", "")
 
                 outputs['clinical_indications'][clin_ind]['SNV'].append(
                     {
