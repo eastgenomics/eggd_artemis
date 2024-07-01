@@ -917,7 +917,7 @@ def write_output_file(
                     # could be text or a df which affects how it is added to
                     # output df
                     if field == 'cnv_excluded_regions_df':
-                        if cnv_data.get(field).isinstance(str):
+                        if isinstance(cnv_data.get(field), str):
                             df = df.append(
                                 {'a': label, 'b': cnv_data.get(field)},
                                 ignore_index=True
