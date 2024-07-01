@@ -632,13 +632,13 @@ def read_excluded_regions_to_df(file_id, project):
     # forming the output df
     df = pd.read_csv(file, sep="\t", names=[
         'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'], header=None)
-    df.insert(0, 'a', ["CNV excluded regions:"] + [None] * (len(df) - 1))
 
     required_headers.sort()
     headers = df.iloc[0, :].tolist()
     headers.sort()
-
     assert required_headers == headers, f"{file_id} doesn't have all the required headers"
+
+    df.insert(0, 'a', ["CNV excluded regions:"] + [None] * (len(df) - 1))
 
     return df
 
