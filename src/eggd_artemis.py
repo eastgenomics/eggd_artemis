@@ -301,7 +301,8 @@ def get_cnv_file_ids(reports, gcnv_dict):
         gen_xlsx_job = report["describe"]["createdBy"]["job"]
 
         excluded_regions_id = dxpy.bindings.dxjob.DXJob(
-            dxid=gen_xlsx_job).describe()["input"]["additional_files"][0]["$dnanexus_link"]
+            dxid=gen_xlsx_job).describe()[
+                "input"]["additional_files"][0]["$dnanexus_link"]
 
         # Find the reports workflow analysis id
         reports_analysis = dxpy.bindings.dxjob.DXJob(
@@ -627,11 +628,15 @@ def read_excluded_regions_to_df(file_id, project):
         mode="r",
     )
 
-    df = pd.read_csv(file, sep="\t", header=0)
+    # letters b -> i used as columns names to aid concatenation of this df when
+    # forming the output df
+    df = pd.read_csv(file, sep="\t", names=[
+        'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'])
 
-    assert all([header in df.columns for header in required_headers]), (
-            f"{file_id} doesn't have all the required headers"
-        )
+    required_headers.sort()
+    headers = df.iloc[0, :].tolist().sort()
+
+    assert required_headers == headers, f"{file_id} doesn't have all the required headers"
 
     return df
 
@@ -805,7 +810,9 @@ def remove_unnecessary_outputs(
                     if cnv_reports:
                         if file.get('CNV count') == '0':
                             file['cnv_url'] = 'No CNVs detected'
-                    if file.get('cnv_excluded_regions_df').empty:
+                    # Column names/header are read into the first row of df,
+                    # therefore if df length is < 2 it contains no data
+                    if len(file.get('cnv_excluded_regions_df')) < 2:
                         file['cnv_excluded_regions_df'] = 'No CNV excluded regions'
     return all_sample_outputs
 
@@ -883,7 +890,8 @@ def write_output_file(
             'snv_url': 'Small variant report',
             'CNV count': 'CNV count',
             'cnv_url': 'CNV variant report',
-            'cnv_session_url': 'CNV IGV Session'
+            'cnv_session_url': 'CNV IGV Session',
+            'cnv_excluded_regions_df': 'CNV excluded regions'
         }
 
         for clinical_indication in outputs['clinical_indications']:
@@ -905,10 +913,15 @@ def write_output_file(
                 # Then add fields for CNV fields for that clinical indication
                 for cnv_data in file_data.get('CNV', {}):
                     if cnv_data.get(field):
-                        df = df.append(
-                            {'a': label, 'b': cnv_data.get(field)},
-                            ignore_index=True
-                        )
+                        if field == 'cnv_excluded_regions_df':
+                            df = pd.concat(
+                                [df, cnv_data.get(field)], ignore_index=True
+                            )
+                        else:
+                            df = df.append(
+                                {'a': label, 'b': cnv_data.get(field)},
+                                ignore_index=True
+                            )
         # Add BAM and BAI URLs for the sample
         for field, label in sample_level_urls.items():
             if outputs.get(field):
@@ -947,7 +960,7 @@ def write_output_file(
         sheet.protection.formatRows = False
         sheet.protection.formatCells = False
 
-        for row_no in range(1, 3000):
+        for row_no in range(1, 5000):
             for col_no in range(1, 100):
                 sheet.cell(row=row_no, column=col_no).protection = Protection(
                     locked=False
