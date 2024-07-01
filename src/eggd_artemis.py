@@ -631,10 +631,11 @@ def read_excluded_regions_to_df(file_id, project):
     # letters b -> i used as columns names to aid concatenation of this df when
     # forming the output df
     df = pd.read_csv(file, sep="\t", names=[
-        'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'])
+        'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'], header=None)
 
     required_headers.sort()
-    headers = df.iloc[0, :].tolist().sort()
+    headers = df.iloc[0, :].tolist()
+    headers.sort()
 
     assert required_headers == headers, f"{file_id} doesn't have all the required headers"
 
