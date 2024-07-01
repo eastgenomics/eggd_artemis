@@ -141,7 +141,7 @@ def find_snv_files(reports):
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
         # submit jobs mapping each id to describe call
         concurrent_jobs = {
-            executor.submit(_find, report) for report in reports
+            executor.submit(_find, report): report for report in reports
         }
 
         for future in concurrent.futures.as_completed(concurrent_jobs):
@@ -212,7 +212,7 @@ def get_cnv_call_details(reports):
         concurrent_jobs = {
             executor.submit(
                 dxpy.describe, file, fields={"name": True, "id": True}
-            ) for file in gcnv_input + gcnv_output
+            ): file for file in gcnv_input + gcnv_output
         }
 
         for future in concurrent.futures.as_completed(concurrent_jobs):
@@ -361,7 +361,7 @@ def get_cnv_file_ids(reports, gcnv_dict):
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
         # submit jobs mapping each id to describe call
         concurrent_jobs = {
-            executor.submit(_find, report) for report in reports
+            executor.submit(_find, report): report for report in reports
         }
 
         for future in concurrent.futures.as_completed(concurrent_jobs):
@@ -638,7 +638,7 @@ def read_excluded_regions_to_df(file_id, project):
     headers.sort()
     assert required_headers == headers, f"{file_id} doesn't have all the required headers"
 
-    df.insert(0, 'a', ["CNV excluded regions:"] + [None] * (len(df) - 1))
+    df.insert(0, 'a', ["CNV excluded regions"] + [None] * (len(df) - 1))
 
     return df
 
@@ -1165,7 +1165,7 @@ def main(
             executor.submit(
                 generate_sample_outputs, sample, sample_data, url_duration,
                 ex_intervals_url, bed_file_url, expiry_date, job_output
-            ) for sample, sample_data in file_data.items()
+            ): sample for sample, sample_data in file_data.items()
         }
 
         for future in concurrent.futures.as_completed(concurrent_jobs):
