@@ -633,10 +633,10 @@ def read_excluded_regions_to_df(file_id, project):
     df = pd.read_csv(file, sep="\t", names=[
         'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'], header=None)
 
-    required_headers.sort()
     headers = df.iloc[0, :].tolist()
-    headers.sort()
-    assert required_headers == headers, f"{file_id} doesn't have all the required headers"
+    missing = set(required_headers) - set(headers)
+
+    assert not missing, f"{file_id} is missing {missing} in its headers"
 
     df.insert(0, 'a', ["CNV excluded regions"] + [None] * (len(df) - 1))
 
@@ -855,6 +855,8 @@ def write_output_file(
     if qc_url.startswith('http'):
         qc_url = f'=HYPERLINK("{qc_url}", "{qc_url}")'
 
+    # Empty dicts {} are added to create empty rows in order to better
+    # organise the output df and resulting spreadsheet
     df = pd.DataFrame([
         {'a': 'Run:', 'b': project_name},
         {'a': 'Number of samples in this file:', 'b': sample_count},
@@ -961,8 +963,8 @@ def write_output_file(
 
     # If lock_cells=True we're protecting populated cells from editing
     # openpyxl is silly and you need to lock a whole sheet then unlock
-    # specific cells - so to do the opposite we unlock the first 3000 rows
-    # and 100 columns (assuming max 20 rows / sample and 96 samples per run).
+    # specific cells - so to do the opposite we unlock the first 5000 rows
+    # and 100 columns.
     # Also set format so that we can still resize rows/columns if protected
     if lock_cells:
         print("lock_cells=True, locking any populated Excel cells")
