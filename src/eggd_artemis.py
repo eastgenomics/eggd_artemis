@@ -954,7 +954,15 @@ def write_output_file(
     # set column widths
     sheet = writer.sheets['Sheet1']
     sheet.column_dimensions['A'].width = 55
-    sheet.column_dimensions['B'].width = 155
+    sheet.column_dimensions['B'].width = 11
+    sheet.column_dimensions['C'].width = 11
+    sheet.column_dimensions['D'].width = 11
+    sheet.column_dimensions['E'].width = 11
+    sheet.column_dimensions['E'].width = 11
+    sheet.column_dimensions['F'].width = 16
+    sheet.column_dimensions['G'].width = 12
+    sheet.column_dimensions['H'].width = 16
+    sheet.column_dimensions['I'].width = 11
 
     sheet['A1'].font = Font(bold=True, name=DEFAULT_FONT.name)
     sheet['A2'].font = Font(bold=True, name=DEFAULT_FONT.name)
@@ -963,8 +971,9 @@ def write_output_file(
 
     # If lock_cells=True we're protecting populated cells from editing
     # openpyxl is silly and you need to lock a whole sheet then unlock
-    # specific cells - so to do the opposite we unlock the first 5000 rows
-    # and 100 columns.
+    # specific cells - so to do the opposite we unlock the number of rows/cols
+    # used (via max rows/cols) and add a buffer of 1000/100 rows/cols so that
+    # surrounding cells are able to be edited. We then lock any populated cells
     # Also set format so that we can still resize rows/columns if protected
     if lock_cells:
         print("lock_cells=True, locking any populated Excel cells")
@@ -973,8 +982,11 @@ def write_output_file(
         sheet.protection.formatRows = False
         sheet.protection.formatCells = False
 
-        for row_no in range(1, 5000):
-            for col_no in range(1, 100):
+        unlock_rows = sheet.max_row + 1000
+        unlock_cols = sheet.max_column + 100
+
+        for row_no in range(1, unlock_rows):
+            for col_no in range(1, unlock_cols):
                 sheet.cell(row=row_no, column=col_no).protection = Protection(
                     locked=False
                 )
