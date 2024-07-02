@@ -141,7 +141,7 @@ def find_snv_files(reports):
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
         # submit jobs mapping each id to describe call
         concurrent_jobs = {
-            executor.submit(_find, report) for report in reports
+            executor.submit(_find, report): report for report in reports
         }
 
         for future in concurrent.futures.as_completed(concurrent_jobs):
@@ -212,7 +212,7 @@ def get_cnv_call_details(reports):
         concurrent_jobs = {
             executor.submit(
                 dxpy.describe, file, fields={"name": True, "id": True}
-            ) for file in gcnv_input + gcnv_output
+            ): file for file in gcnv_input + gcnv_output
         }
 
         for future in concurrent.futures.as_completed(concurrent_jobs):
@@ -301,7 +301,8 @@ def get_cnv_file_ids(reports, gcnv_dict):
         gen_xlsx_job = report["describe"]["createdBy"]["job"]
 
         excluded_regions_id = dxpy.bindings.dxjob.DXJob(
-            dxid=gen_xlsx_job).describe()["input"]["additional_files"][0]["$dnanexus_link"]
+            dxid=gen_xlsx_job).describe()[
+                "input"]["additional_files"][0]["$dnanexus_link"]
 
         # Find the reports workflow analysis id
         reports_analysis = dxpy.bindings.dxjob.DXJob(
@@ -360,7 +361,7 @@ def get_cnv_file_ids(reports, gcnv_dict):
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
         # submit jobs mapping each id to describe call
         concurrent_jobs = {
-            executor.submit(_find, report) for report in reports
+            executor.submit(_find, report): report for report in reports
         }
 
         for future in concurrent.futures.as_completed(concurrent_jobs):
@@ -627,11 +628,17 @@ def read_excluded_regions_to_df(file_id, project):
         mode="r",
     )
 
-    df = pd.read_csv(file, sep="\t", header=0)
+    # letters a -> i used as columns names to aid concatenation of this df when
+    # forming the output df
+    df = pd.read_csv(file, sep="\t", names=[
+        'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'], header=None)
 
-    assert all([header in df.columns for header in required_headers]), (
-            f"{file_id} doesn't have all the required headers"
-        )
+    headers = df.iloc[0, :].tolist()
+    missing = set(required_headers) - set(headers)
+
+    assert not missing, f"{file_id} is missing {missing} in its headers"
+
+    df.insert(0, 'a', ["CNV excluded regions"] + [None] * (len(df) - 1))
 
     return df
 
@@ -699,7 +706,7 @@ def generate_sample_outputs(
                         snv_file['Summary text file'],
                         project=dx_project,
                         mode="r"
-                    ).read()
+                    ).read().replace("Clinical report summary:\n", "")
 
                 outputs['clinical_indications'][clin_ind]['SNV'].append(
                     {
@@ -805,13 +812,15 @@ def remove_unnecessary_outputs(
                     if cnv_reports:
                         if file.get('CNV count') == '0':
                             file['cnv_url'] = 'No CNVs detected'
-                    if file.get('cnv_excluded_regions_df').empty:
+                    # Column names/header are read into the first row of df,
+                    # therefore if df length is < 2 it contains no data
+                    if len(file.get('cnv_excluded_regions_df')) < 2:
                         file['cnv_excluded_regions_df'] = 'No CNV excluded regions'
     return all_sample_outputs
 
 
 def write_output_file(
-    sample_urls, today, expiry_date, multiqc_url, qc_url, project_name,
+    sample_outputs, today, expiry_date, multiqc_url, qc_url, project_name,
     lock_cells
 ):
     """
@@ -819,8 +828,8 @@ def write_output_file(
 
     Parameters
     ----------
-    sample_urls : dict
-        generated URLs for each sample
+    sample_outputs : dict
+        generated outputs (i.e. URLs, text and dataframes) for each sample
     today : str
         today date
     expiry_date : str
@@ -840,34 +849,34 @@ def write_output_file(
     """
     print("Writing output file")
 
-    sample_count = str(len(sample_urls.keys()))
+    sample_count = str(len(sample_outputs.keys()))
 
     multiqc_url = f'=HYPERLINK("{multiqc_url}", "{multiqc_url}")'
     if qc_url.startswith('http'):
         qc_url = f'=HYPERLINK("{qc_url}", "{qc_url}")'
 
-    df = pd.DataFrame(columns=['a', 'b'])
-    df = df.append({'a': 'Run:', 'b': project_name}, ignore_index=True)
-    df = df.append(
+    # Empty dicts {} are added to create empty rows in order to better
+    # organise the output df and resulting spreadsheet
+    df = pd.DataFrame([
+        {'a': 'Run:', 'b': project_name},
         {'a': 'Number of samples in this file:', 'b': sample_count},
-        ignore_index=True
-    )
-    df = df.append({}, ignore_index=True)
-    df = df.append({'a': 'Date Created:', 'b': today}, ignore_index=True)
-    df = df.append({'a': 'Expiry Date:', 'b': expiry_date}, ignore_index=True)
-    df = df.append({}, ignore_index=True)
-    df = df.append({'a': 'Run Level Files'}, ignore_index=True)
-    df = df.append({'a': 'MultiQC report', 'b': multiqc_url}, ignore_index=True)
-    df = df.append({'a': 'QC Status Report', 'b': qc_url}, ignore_index=True)
-    df = df.append({}, ignore_index=True)
-    df = df.append({}, ignore_index=True)
-    df = df.append({'a': 'Per Sample Files'}, ignore_index=True)
-    df = df.append({}, ignore_index=True)
+        {},
+        {'a': 'Date Created:', 'b': today},
+        {'a': 'Expiry Date:', 'b': expiry_date},
+        {},
+        {'a': 'Run Level Files'},
+        {'a': 'MultiQC report', 'b': multiqc_url},
+        {'a': 'QC Status Report', 'b': qc_url},
+        {},
+        {},
+        {'a': 'Per Sample Files'},
+        {}
+    ])
 
-    sample_order = sorted(sample_urls.keys())
+    sample_order = sorted(sample_outputs.keys())
 
     for sample in sample_order:
-        urls = sample_urls.get(sample)
+        outputs = sample_outputs.get(sample)
 
         df = df.append({'a': sample}, ignore_index=True)
 
@@ -878,24 +887,26 @@ def write_output_file(
         }
 
         # Fields we need once per report
-        url_fields = {
+        output_fields = {
             'coverage_url': 'Coverage report',
+            'coverage_summary': 'Coverage summary',
             'SNV count': 'SNV count post-filtering',
             'snv_url': 'Small variant report',
             'CNV count': 'CNV count',
             'cnv_url': 'CNV variant report',
-            'cnv_session_url': 'CNV IGV Session'
+            'cnv_session_url': 'CNV IGV Session',
+            'cnv_excluded_regions_df': 'CNV excluded regions'
         }
 
-        for clinical_indication in urls['clinical_indications']:
-            file_data = urls['clinical_indications'][clinical_indication]
+        for clinical_indication in outputs['clinical_indications']:
+            file_data = outputs['clinical_indications'][clinical_indication]
 
             # If we know clinical indication add this as a header
             if clinical_indication != 'Unknown':
                 df = df.append({'a': clinical_indication}, ignore_index=True)
 
             # Add fields for any SNV files first for that clinical indication
-            for field, label in url_fields.items():
+            for field, label in output_fields.items():
                 for snv_data in file_data.get('SNV', {}):
                     if snv_data.get(field):
                         df = df.append(
@@ -905,19 +916,33 @@ def write_output_file(
 
                 # Then add fields for CNV fields for that clinical indication
                 for cnv_data in file_data.get('CNV', {}):
-                    if cnv_data.get(field):
-                        df = df.append(
-                            {'a': label, 'b': cnv_data.get(field)},
-                            ignore_index=True
-                        )
+                    # For excluded regions the output is always present but
+                    # could be text or a df which affects how it is added to
+                    # output df
+                    if field == 'cnv_excluded_regions_df':
+                        if isinstance(cnv_data.get(field), str):
+                            df = df.append(
+                                {'a': label, 'b': cnv_data.get(field)},
+                                ignore_index=True
+                            )
+                        else:
+                            df = pd.concat(
+                                [df, cnv_data.get(field)], ignore_index=True
+                            )
+                    else:
+                        if cnv_data.get(field):
+                            df = df.append(
+                                {'a': label, 'b': cnv_data.get(field)},
+                                ignore_index=True
+                            )
         # Add BAM and BAI URLs for the sample
         for field, label in sample_level_urls.items():
-            if urls.get(field):
+            if outputs.get(field):
                 if field == 'bam_url':
                     df = df.append({}, ignore_index=True)
 
                 df = df.append(
-                    {'a': label, 'b': urls.get(field)}, ignore_index=True
+                    {'a': label, 'b': outputs.get(field)}, ignore_index=True
                 )
 
         df = df.append({}, ignore_index=True)
@@ -929,7 +954,15 @@ def write_output_file(
     # set column widths
     sheet = writer.sheets['Sheet1']
     sheet.column_dimensions['A'].width = 55
-    sheet.column_dimensions['B'].width = 155
+    sheet.column_dimensions['B'].width = 11
+    sheet.column_dimensions['C'].width = 11
+    sheet.column_dimensions['D'].width = 11
+    sheet.column_dimensions['E'].width = 11
+    sheet.column_dimensions['E'].width = 11
+    sheet.column_dimensions['F'].width = 16
+    sheet.column_dimensions['G'].width = 12
+    sheet.column_dimensions['H'].width = 16
+    sheet.column_dimensions['I'].width = 11
 
     sheet['A1'].font = Font(bold=True, name=DEFAULT_FONT.name)
     sheet['A2'].font = Font(bold=True, name=DEFAULT_FONT.name)
@@ -938,8 +971,9 @@ def write_output_file(
 
     # If lock_cells=True we're protecting populated cells from editing
     # openpyxl is silly and you need to lock a whole sheet then unlock
-    # specific cells - so to do the opposite we unlock the first 3000 rows
-    # and 100 columns (assuming max 20 rows / sample and 96 samples per run).
+    # specific cells - so to do the opposite we unlock the number of rows/cols
+    # used (via max rows/cols) and add a buffer of 1000/100 rows/cols so that
+    # surrounding cells are able to be edited. We then lock any populated cells
     # Also set format so that we can still resize rows/columns if protected
     if lock_cells:
         print("lock_cells=True, locking any populated Excel cells")
@@ -948,8 +982,11 @@ def write_output_file(
         sheet.protection.formatRows = False
         sheet.protection.formatCells = False
 
-        for row_no in range(1, 3000):
-            for col_no in range(1, 100):
+        unlock_rows = sheet.max_row + 1000
+        unlock_cols = sheet.max_column + 100
+
+        for row_no in range(1, unlock_rows):
+            for col_no in range(1, unlock_cols):
                 sheet.cell(row=row_no, column=col_no).protection = Protection(
                     locked=False
                 )
@@ -1132,8 +1169,8 @@ def main(
         '%Y-%m-%d') + datetime.timedelta(seconds=url_duration)
     ).strftime('%Y-%m-%d')
 
-    # generate all urls for each sample
-    logger.info("Generating per sample URLs")
+    # generate all outputs for each sample
+    logger.info("Generating per sample outputs")
     all_sample_outputs = {}
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
@@ -1142,7 +1179,7 @@ def main(
             executor.submit(
                 generate_sample_outputs, sample, sample_data, url_duration,
                 ex_intervals_url, bed_file_url, expiry_date, job_output
-            ) for sample, sample_data in file_data.items()
+            ): sample for sample, sample_data in file_data.items()
         }
 
         for future in concurrent.futures.as_completed(concurrent_jobs):
@@ -1188,6 +1225,7 @@ def main(
                 'SNV': [{
                     'SNV count': '7',
                     'coverage_url: '=HYPERLINK("hyperlink", "hyperlink"),
+                    'coverage_summary' : 'coverage summary text',
                     'snv_url': '=HYPERLINK("hyperlink", "hyperlink"),
                 }],
                 'CNV': [{
