@@ -378,7 +378,7 @@ def get_cnv_file_ids(reports, gcnv_dict):
                 # If sample and clinical indication already exists, append CNV
                 # file info to existing list.
                 # If sample doesn't exist yet just add the data as is
-                cnv_data[sample]['sample'] = data['sample']
+                cnv_data[sample]['sample'] = sample
                 cnv_data[sample]['Alignment BAM'] = data['Alignment BAM']
                 cnv_data[sample]['Alignment BAI'] = data['Alignment BAI']
                 cnv_data[sample][
