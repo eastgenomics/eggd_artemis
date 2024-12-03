@@ -67,7 +67,7 @@
       "name": "select_tracks",
       "label": "select tracks",
       "class": "string",
-      "optional": false,
+      "optional": true,
       "help": "comma separated string of IGV reference tracks to select for including in the IGV session file"
     }
   ],
