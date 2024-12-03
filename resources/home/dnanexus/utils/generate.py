@@ -3,11 +3,97 @@
 from collections import defaultdict
 import concurrent
 import os
+from typing import Tuple
 
 import dxpy
+from mergedeep import merge
 
 from .io import make_cnv_session, read_excluded_regions_to_df
-from .query import make_url
+from .query import (
+    get_cnv_file_ids,
+    get_cnv_call_details,
+    find_snv_files,
+    make_url,
+)
+from .util_functions import get_excluded_intervals
+
+
+def gather_snv_data(snv_paths, dx_project) -> dict:
+    """
+    Finds all xlsx reports and the associated job input files using
+    query.find_snv_files from the given SNV path(s)
+
+    Args:
+        snv_paths (str): comma separated string of SNV path(s) to search
+        dx_project (str) : DNAnexus project ID to search
+
+    Returns:
+        snv_data (dict): dict of all sample SNV file data
+    """
+    snv_data = {}
+
+    for path in snv_paths.split(","):
+        print(f"Gathering reports from: {path}")
+        snv_reports = list(
+            dxpy.bindings.search.find_data_objects(
+                name="*xlsx",
+                name_mode="glob",
+                folder=path,
+                project=dx_project,
+                describe=True,
+            )
+        )
+
+        snv_files = find_snv_files(snv_reports)
+        merge(snv_data, snv_files)
+
+    print(f"Size of snv data dict: {len(snv_data.keys())}")
+
+    return snv_data
+
+
+def gather_cnv_data(cnv_paths, dx_project, url_duration) -> Tuple[dict, str]:
+    """
+    Finds all xlsx reports and the associated job input files from the
+    given CNV path(s)
+
+    Args:
+        cnv_paths (str): comma separated string of CNV path(s) to search
+        dx_project (str): DNAnexus project ID to search
+        url_duration (int): maximum duration of generated download URL
+
+    Returns:
+        cnv_data (dict): dict of all sample CNV file data
+        ex_intervals_url (str): download URL for the excluded intervals file
+    """
+    cnv_data = {}
+
+    for path in cnv_paths.split(","):
+        print(f"Gathering reports from: {path}")
+        cnv_reports = list(
+            dxpy.bindings.search.find_data_objects(
+                name="*xlsx",
+                name_mode="glob",
+                folder=path,
+                project=dx_project,
+                describe=True,
+            )
+        )
+
+        gcnv_job_info = get_cnv_call_details(cnv_reports)
+        cnv_files = get_cnv_file_ids(cnv_reports, gcnv_job_info)
+
+        # Get excluded intervals file
+        excluded_intervals = get_excluded_intervals(gcnv_job_info)
+        ex_intervals_url = make_url(
+            excluded_intervals, dx_project, url_duration
+        )
+
+        merge(cnv_data, cnv_files)
+
+    print(f"Size of cnv data dict: {len(cnv_data.keys())}")
+
+    return cnv_data, ex_intervals_url
 
 
 def generate_single_sample_output(

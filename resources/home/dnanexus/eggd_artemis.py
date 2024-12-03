@@ -1,29 +1,23 @@
 """Main app entrypoint"""
-
-import os
+import glob
 import dxpy
 import datetime
 import logging
-
-from glob import glob
 import pip
 
 pip.main(["install", "--no-index", "--no-deps", *glob("packages/*")])
 
-from mergedeep import merge
 
-from utils.generate import generate_all_sample_outputs
-from utils.io import write_output_file
-from utils.query import (
-    get_cnv_call_details,
-    get_cnv_file_ids,
-    get_multiqc_report,
-    make_url,
-    find_snv_files,
+from utils.generate import (
+    gather_cnv_data,
+    gather_snv_data,
+    generate_all_sample_outputs,
 )
+from utils.io import write_output_file
+from utils.query import get_multiqc_report, make_url
 from utils.util_functions import (
     add_session_file_ids_to_job_output,
-    get_excluded_intervals,
+    initialise_project,
     remove_unnecessary_outputs,
 )
 
@@ -44,49 +38,15 @@ def main(
     logger.propagate = False
     logger.setLevel(logging.DEBUG)
 
-    # Get the project ID
-    DX_PROJECT = os.environ.get("DX_PROJECT_CONTEXT_ID")
+    project_name, project_id, job_output_folder = initialise_project()
 
-    # Set the environment context to allow upload
-    dxpy.set_workspace_id(DX_PROJECT)
-
-    # Get output folder set for this job
-    job_output = dxpy.bindings.dxjob.DXJob(
-        os.environ.get("DX_JOB_ID")
-    ).describe()["folder"]
-
-    # Make output folder for job
-    dxpy.api.project_new_folder(
-        DX_PROJECT, input_params={"folder": job_output, "parents": True}
-    )
-
-    # Get name of project for output naming
-    project_name = dxpy.describe(DX_PROJECT)["name"]
-    project_name = "_".join(project_name.split("_")[1:-1])
+    snv_data = {}
+    cnv_data = {}
 
     # Gather required SNV files if SNV path is provided
     if snv_path:
         logger.info("Gathering Small variant files")
-
-        snv_data = {}
-
-        for path in snv_path.split(","):
-            print(f"Gathering reports from: {path}")
-            snv_reports = list(
-                dxpy.bindings.search.find_data_objects(
-                    name="*xlsx",
-                    name_mode="glob",
-                    folder=path,
-                    project=DX_PROJECT,
-                    describe=True,
-                )
-            )
-
-            # Get SNV ids
-            snv_files = find_snv_files(snv_reports)
-            merge(snv_data, snv_files)
-
-        print(f"Size of snv data dict: {len(snv_data.keys())}")
+        snv_data = gather_snv_data(snv_paths=snv_path, dx_project=project_id)
 
         # If multiqc report not given, search for multiqc report
         if not multiqc_report:
@@ -95,7 +55,7 @@ def main(
                 f"with path {snv_path}"
             )
             multiqc_report = get_multiqc_report(
-                snv_path.split(",")[0], DX_PROJECT
+                snv_path.split(",")[0], project_id
             )
 
     # Gather required CNV files if CNV path is provided
@@ -104,39 +64,18 @@ def main(
 
         # Create folder for session files
         dxpy.api.project_new_folder(
-            DX_PROJECT,
+            project_id,
             input_params={
-                "folder": f"{job_output}/igv_sessions",
+                "folder": f"{job_output_folder}/igv_sessions",
                 "parents": True,
             },
         )
 
-        cnv_data = {}
-
-        for path in cnv_path.split(","):
-            print(f"Gathering reports from: {path}")
-            cnv_reports = list(
-                dxpy.bindings.search.find_data_objects(
-                    name="*xlsx",
-                    name_mode="glob",
-                    folder=path,
-                    project=DX_PROJECT,
-                    describe=True,
-                )
-            )
-
-            gcnv_job_info = get_cnv_call_details(cnv_reports)
-            cnv_files = get_cnv_file_ids(cnv_reports, gcnv_job_info)
-
-            # Get excluded intervals file
-            excluded_intervals = get_excluded_intervals(gcnv_job_info)
-            ex_intervals_url = make_url(
-                excluded_intervals, DX_PROJECT, url_duration
-            )
-
-            merge(cnv_data, cnv_files)
-
-        print(f"Size of cnv data dict: {len(cnv_data.keys())}")
+        cnv_data, ex_intervals_url = gather_cnv_data(
+            cnv_paths=cnv_path,
+            dx_project=project_id,
+            url_duration=url_duration,
+        )
 
         # If multiqc report not given or found earlier, search for it
         if not multiqc_report:
@@ -145,7 +84,7 @@ def main(
                 f"with path {cnv_path}"
             )
             multiqc_report = get_multiqc_report(
-                cnv_path.split(",")[0], DX_PROJECT
+                cnv_path.split(",")[0], project_id
             )
     else:
         ex_intervals_url = ""
@@ -163,7 +102,7 @@ def main(
 
     # If a QC Status xlsx is provided, add to a link to the output
     if qc_status:
-        qc_status_url = make_url(qc_status, DX_PROJECT, url_duration)
+        qc_status_url = make_url(qc_status, project_id, url_duration)
     else:
         qc_status_url = "No QC status file provided"
 
@@ -188,16 +127,17 @@ def main(
     ).strftime("%Y-%m-%d")
 
     logger.info("Generating per sample outputs")
+
     all_sample_outputs = generate_all_sample_outputs(
         file_data=file_data,
         url_duration=url_duration,
         ex_intervals_url=ex_intervals_url,
         bed_file_url=bed_file_url,
         expiry_date=expiry_date,
-        job_output=job_output,
+        job_output=job_output_folder,
     )
 
-    multiqc_url = make_url(multiqc_report, DX_PROJECT, url_duration)
+    multiqc_url = make_url(multiqc_report, project_id, url_duration)
 
     # Remove download URLs for reports with no variants in and remove
     # excluded regions dataframe if no excluded regions
@@ -218,7 +158,7 @@ def main(
     # Upload output to the platform
     output = {}
     url_file = dxpy.upload_local_file(
-        filename=output_xlsx_file, folder=job_output, tags=[expiry_date]
+        filename=output_xlsx_file, folder=job_output_folder, tags=[expiry_date]
     )
     output["url_file"] = dxpy.dxlink(url_file)
 

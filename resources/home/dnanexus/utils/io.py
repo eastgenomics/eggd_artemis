@@ -368,6 +368,6 @@ def write_output_file(
     output_file = f"{project_name}_{today}.xlsx"
     writer.book.save(output_file)
 
-    print(f"Output written to {f"{project_name}_{today}.xlsx"}")
+    print(f"Output written to {output_file}")
 
-    return f"{project_name}_{today}.xlsx"
+    return output_file

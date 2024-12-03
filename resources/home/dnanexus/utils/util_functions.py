@@ -1,8 +1,9 @@
 """General utility functions"""
 
-from typing import Union
+import os
+from typing import Tuple, Union
 
-from dxpy import dxlink
+import dxpy
 
 
 def add_session_file_ids_to_job_output(all_sample_outputs, job_output) -> dict:
@@ -62,7 +63,9 @@ def add_session_file_ids_to_job_output(all_sample_outputs, job_output) -> dict:
     print(f"Found {len(session_files)} session files to link to job output")
 
     if session_files:
-        job_output["session_files"] = [dxlink(item) for item in session_files]
+        job_output["session_files"] = [
+            dxpy.dxlink(item) for item in session_files
+        ]
 
     return job_output
 
@@ -81,6 +84,38 @@ def get_excluded_intervals(gcnv_output_dict) -> Union[str, None]:
         if k.endswith("excluded_intervals.bed"):
             return v
     return None
+
+
+def initialise_project() -> Tuple[str, str, str]:
+    """
+    Set required project data, get the project name and destination for
+    downstream naming
+
+    Returns:
+        project_name (str): name of DNAnexus project
+        project_id (str): ID of DNAnexus project
+        job_output (str): destination folder set for the job
+    """
+    project_id = os.environ.get("project_id_CONTEXT_ID")
+
+    # Set the environment context to allow upload
+    dxpy.set_workspace_id(project_id)
+
+    # Get output folder set for this job
+    job_output = dxpy.bindings.dxjob.DXJob(
+        os.environ.get("DX_JOB_ID")
+    ).describe()["folder"]
+
+    # Make output folder for job
+    dxpy.api.project_new_folder(
+        project_id, input_params={"folder": job_output, "parents": True}
+    )
+
+    # Get name of project for output naming
+    project_name = dxpy.describe(project_id)["name"]
+    project_name = "_".join(project_name.split("_")[1:-1])
+
+    return project_name, project_id, job_output
 
 
 def set_order_map(snv_only=False) -> dict:
