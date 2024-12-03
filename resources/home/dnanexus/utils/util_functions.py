@@ -1,5 +1,7 @@
 """General utility functions"""
 
+from typing import Union
+
 from dxpy import dxlink
 
 
@@ -65,14 +67,15 @@ def add_session_file_ids_to_job_output(all_sample_outputs, job_output) -> dict:
     return job_output
 
 
-def get_excluded_intervals(gcnv_output_dict):
+def get_excluded_intervals(gcnv_output_dict) -> Union[str, None]:
     """Get the excluded regions file from the gcnv dictionary
 
     Args:
         gcnv_output_dict (dict): dictionary of gcnv i/o files
 
     Returns:
-        excluded_file (str): file id of the excluded regions file
+        excluded_file (str | None): file id of the excluded regions file
+            or None if excluded_intervals.bed not found in gCNV output
     """
     for k, v in gcnv_output_dict.items():
         if k.endswith("excluded_intervals.bed"):
@@ -80,7 +83,7 @@ def get_excluded_intervals(gcnv_output_dict):
     return None
 
 
-def set_order_map(snv_only=False):
+def set_order_map(snv_only=False) -> dict:
     """Set the order of the session depending on input
 
     Args:
@@ -110,7 +113,9 @@ def set_order_map(snv_only=False):
     return order_map
 
 
-def remove_unnecessary_outputs(all_sample_outputs, snv_reports, cnv_reports):
+def remove_unnecessary_outputs(
+    all_sample_outputs, snv_reports, cnv_reports
+) -> dict:
     """
     Remove links to download Excel reports if there are no variants and remove
     excluded regions dataframe if there are no excluded regions

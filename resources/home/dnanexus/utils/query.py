@@ -2,18 +2,20 @@
 
 from collections import defaultdict
 import concurrent
+from typing import Union
 
 import dxpy
 
 
-def get_multiqc_report(path_to_reports, project):
-    """Find appropriate multiqc file
+def get_multiqc_report(path_to_reports, project) -> Union[str, None]:
+    """
+    Find appropriate multiqc file
 
     Args:
         snv_path (string): path to snv reports
 
     Returns:
-        multiqc_file (str): file id of the multiqc file
+        multiqc_file (str): file id of the multiqc file or None if not found
     """
     # Get path to single from reports path
     single = f"/output/{path_to_reports.split('/')[2]}"
@@ -39,8 +41,9 @@ def get_multiqc_report(path_to_reports, project):
     return multiqc
 
 
-def make_url(file_id, project, url_duration):
-    """Given a file id create a download url
+def make_url(file_id, project, url_duration) -> str:
+    """
+    Given a file id create a download url
 
     Args:
         file_id (string/dict): dxpy file id or dnanexus file link
@@ -77,15 +80,17 @@ def make_url(file_id, project, url_duration):
     return file_url
 
 
-def get_cnv_call_details(reports):
-    """Gets the job id of the cnv call job and stores input and output
-        files in a dictionary for later use
+def get_cnv_call_details(reports) -> dict:
+    """
+    Gets the job id of the cnv call job and stores input and output
+    files in a dictionary for later use
 
     Args:
         reports (list): list of cnv report objects from dxpy search
 
     Returns:
-        calling_files (str): dictionary storing all input and output information
+        calling_files (dict): dictionary storing all input and
+            output information
     """
     # Get the job id of the generate workbook job
     gen_xlsx_job = reports[0]["describe"]["createdBy"]["job"]
@@ -142,8 +147,9 @@ def get_cnv_call_details(reports):
     return calling_files
 
 
-def get_cnv_file_ids(reports, gcnv_dict):
-    """Gather all related file ids for cnv files
+def get_cnv_file_ids(reports, gcnv_dict) -> dict:
+    """
+    Gather all related file ids for cnv files
 
     Args:
         reports (list): list of cnv report objects from dxpy search
@@ -152,6 +158,7 @@ def get_cnv_file_ids(reports, gcnv_dict):
     Returns:
         cnv_data (dict): Nested dictionary of files with sample name
             as key and nested dict of CNV files by clinical indication
+
     Example:
     {
         'X123456-GM1234567-23NGCEN23-1234-F-99347387: {
@@ -319,8 +326,9 @@ def get_cnv_file_ids(reports, gcnv_dict):
     return cnv_data
 
 
-def find_snv_files(reports):
-    """Gather files related to SNV reports
+def find_snv_files(reports) -> dict:
+    """
+    Gather files related to SNV reports
 
     Args:
         reports (list): List of SNV report dxpy describe dicts
@@ -328,6 +336,7 @@ def find_snv_files(reports):
     Returns:
         snv_data (dict): Nested dictionary of files with sample name
             as key and list of SNV files within each clinical indication
+
     Example:
     {
         'X123456-GM1234567-23NGCEN23-1234-F-99347387: {

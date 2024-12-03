@@ -205,7 +205,7 @@ def main(
         all_sample_outputs, snv_reports=True, cnv_reports=True
     )
 
-    write_output_file(
+    output_xlsx_file = write_output_file(
         all_sample_outputs,
         today,
         expiry_date,
@@ -218,7 +218,7 @@ def main(
     # Upload output to the platform
     output = {}
     url_file = dxpy.upload_local_file(
-        f"{project_name}_{today}.xlsx", folder=job_output, tags=[expiry_date]
+        filename=output_xlsx_file, folder=job_output, tags=[expiry_date]
     )
     output["url_file"] = dxpy.dxlink(url_file)
 
