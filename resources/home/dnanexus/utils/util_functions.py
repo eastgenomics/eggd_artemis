@@ -130,8 +130,11 @@ def filter_reference_tracks(select_tracks, reference_tracks) -> list:
 
     Returns:
         reference_tracks (list): filtered list of reference tracks
+
+    Raises:
+        ValueError: raised if invalid track names provided to select_tracks
     """
-    select_tracks = [x.strip().lower() for x in select_tracks.split()]
+    select_tracks = [x.strip().lower() for x in select_tracks.split(",")]
     available_reference_tracks = [x["name"].lower() for x in reference_tracks]
 
     invalid_tracks = [
