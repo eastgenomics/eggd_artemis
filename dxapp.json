@@ -55,6 +55,13 @@
       "optional": true,
       "default": true,
       "help": "Boolean which controls whether to lock any cells for editing if they are populated in the Excel output file"
+    },
+    {
+      "name": "build",
+      "label": "build",
+      "class": "int",
+      "default": 37,
+      "help": "determines if to use build 37 or 38 reference file links in the session files"
     }
   ],
   "outputSpec": [
