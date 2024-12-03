@@ -162,18 +162,12 @@ def check_session_track_order(session_tracks) -> list:
     if all(orders_set):
         return session_tracks
 
-    print("setting order")
-
     max_set_order = max([x for x in orders_set if x])
     ordered_tracks = []
 
     for track in session_tracks:
         if not track.get("order"):
-            print("unordered track")
             max_set_order += 1
-
-            print(track)
-            print(max_set_order)
             track["order"] = max_set_order
 
         ordered_tracks.append(track)
