@@ -1,5 +1,6 @@
 """Main app entrypoint"""
-import glob
+
+from glob import glob
 import dxpy
 import datetime
 import logging
