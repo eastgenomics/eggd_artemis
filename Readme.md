@@ -15,6 +15,7 @@ Gathers required files and creates file containing urls to allow file download w
 * `multiqc_report`[optional]: Input of the MultiQC report - if not provided, will search for a MultiQC job in the project to find this
 * `lock_cells`[optional]: Determines whether to protect any populated cells in the output .xlsx from editing (Default=True)
 * `build` [optional]: determines if to use build 37 or 38 reference file links in the session files (default: 37; choices: 37 | 38)
+* `select_tracks` [optional]: comma separated string of reference tracks to include in the IGV sessions file, must be one of the track names defined under the `"tracks"` key for the selected build in [defaults.py](https://github.com/eastgenomics/eggd_artemis/tree/main/resources/home/dnanexus/utils/defaults.py)
 
 ## How does this app work?
 
