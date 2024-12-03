@@ -1,4 +1,4 @@
-"""Main app entrypoint"""
+"""Main app entrypoint for the app"""
 
 from glob import glob
 import dxpy
@@ -8,6 +8,7 @@ import pip
 
 pip.main(["install", "--no-index", "--no-deps", *glob("packages/*")])
 
+from mergedeep import merge
 
 from utils.generate import (
     gather_cnv_data,

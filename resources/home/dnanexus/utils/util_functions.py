@@ -96,7 +96,7 @@ def initialise_project() -> Tuple[str, str, str]:
         project_id (str): ID of DNAnexus project
         job_output (str): destination folder set for the job
     """
-    project_id = os.environ.get("project_id_CONTEXT_ID")
+    project_id = os.environ.get("DX_PROJECT_CONTEXT_ID")
 
     # Set the environment context to allow upload
     dxpy.set_workspace_id(project_id)
