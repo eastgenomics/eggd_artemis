@@ -1,5 +1,69 @@
 """General utility functions"""
 
+from dxpy import dxlink
+
+
+def add_session_file_ids_to_job_output(all_sample_outputs, job_output) -> dict:
+    """
+    Search through the all samples output dict for any session file URLs
+    generated and add them to the job output to link to the job output spec
+
+    Example all_sample_outputs format we're looping over:
+    'sample-name': {
+        'sample': 'sample-name',
+        'bam_url': 'url_for_bam',
+        'bai_url':  'url_for_bai',
+        'clinical_indications': {
+            'R141.1': {
+                'SNV': [{
+                    'SNV count': '7',
+                    'coverage_url: '=HYPERLINK("hyperlink", "hyperlink"),
+                    'coverage_summary' : 'coverage summary text',
+                    'snv_url': '=HYPERLINK("hyperlink", "hyperlink"),
+                }],
+                'CNV': [{
+                    'CNV count': '1',
+                    'cnv_bed': 'bed_url',
+                    'cnv_seg': 'seg_url',
+                    'cnv_session_fileid': 'file-XYZ',
+                    'cnv_url': '=HYPERLINK("hyperlink", "hyperlink"),
+                    'cnv_session_url': '=HYPERLINK("hyperlink", "hyperlink"),
+                    'cnv_excluded_regions_df': pd.DataFrame of excluded regions file
+                }]
+            }
+        }
+    }
+
+    Parameters
+    ----------
+    all_sample_outputs : dict
+        dict of all sample output data
+    job_output : dict
+        output mapping dict of the job output
+
+    Returns
+    -------
+    dict
+        job output dict with added session file IDs
+    """
+    session_files = []
+
+    for _, sample_info in all_sample_outputs.items():
+        for clin_ind in sample_info.get("clinical_indications"):
+            if sample_info["clinical_indications"][clin_ind].get("CNV"):
+                for cnv_item in sample_info["clinical_indications"][clin_ind][
+                    "CNV"
+                ]:
+                    session_file_id = cnv_item["cnv_session_fileid"]
+                    session_files.append(session_file_id)
+
+    print(f"Found {len(session_files)} session files to link to job output")
+
+    if session_files:
+        job_output["session_files"] = [dxlink(item) for item in session_files]
+
+    return job_output
+
 
 def get_excluded_intervals(gcnv_output_dict):
     """Get the excluded regions file from the gcnv dictionary

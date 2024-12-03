@@ -1,28 +1,19 @@
 """Main app entrypoint"""
 
-import concurrent
 import os
 import dxpy
 import datetime
 import logging
-from collections import defaultdict
 
 from glob import glob
 import pip
 
 pip.main(["install", "--no-index", "--no-deps", *glob("packages/*")])
 
-
 from mergedeep import merge
-from openpyxl.styles import DEFAULT_FONT, Font, Protection
-import pandas as pd
 
 from utils.generate import generate_all_sample_outputs
-from utils.io import (
-    make_cnv_session,
-    read_excluded_regions_to_df,
-    write_output_file,
-)
+from utils.io import write_output_file
 from utils.query import (
     get_cnv_call_details,
     get_cnv_file_ids,
@@ -31,6 +22,7 @@ from utils.query import (
     find_snv_files,
 )
 from utils.util_functions import (
+    add_session_file_ids_to_job_output,
     get_excluded_intervals,
     remove_unnecessary_outputs,
 )
@@ -54,7 +46,6 @@ def main(
 
     # Get the project ID
     DX_PROJECT = os.environ.get("DX_PROJECT_CONTEXT_ID")
-    print(DX_PROJECT)
 
     # Set the environment context to allow upload
     dxpy.set_workspace_id(DX_PROJECT)
@@ -231,47 +222,9 @@ def main(
     )
     output["url_file"] = dxpy.dxlink(url_file)
 
-    # Find session files to link to output
-    """
-    Example all_sample_outputs format we're looping over:
-    'sample-name': {
-        'sample': 'sample-name',
-        'bam_url': 'url_for_bam',
-        'bai_url':  'url_for_bai',
-        'clinical_indications': {
-            'R141.1': {
-                'SNV': [{
-                    'SNV count': '7',
-                    'coverage_url: '=HYPERLINK("hyperlink", "hyperlink"),
-                    'coverage_summary' : 'coverage summary text',
-                    'snv_url': '=HYPERLINK("hyperlink", "hyperlink"),
-                }],
-                'CNV': [{
-                    'CNV count': '1',
-                    'cnv_bed': 'bed_url',
-                    'cnv_seg': 'seg_url',
-                    'cnv_session_fileid': 'file-XYZ',
-                    'cnv_url': '=HYPERLINK("hyperlink", "hyperlink"),
-                    'cnv_session_url': '=HYPERLINK("hyperlink", "hyperlink"),
-                    'cnv_excluded_regions_df': pd.DataFrame of excluded regions file
-                }]
-            }
-        }
-    }
-    """
-    session_files = []
-    for sample, sample_info in all_sample_outputs.items():
-        for clin_ind in sample_info.get("clinical_indications"):
-            if sample_info["clinical_indications"][clin_ind].get("CNV"):
-                for cnv_item in sample_info["clinical_indications"][clin_ind][
-                    "CNV"
-                ]:
-                    session_file_id = cnv_item["cnv_session_fileid"]
-                    session_files.append(session_file_id)
-
-    print(f"Found {len(session_files)} session files to link to job output")
-    if session_files:
-        output["session_files"] = [dxpy.dxlink(item) for item in session_files]
+    output = add_session_file_ids_to_job_output(
+        all_sample_outputs=all_sample_outputs, job_output=output
+    )
 
     return output
 

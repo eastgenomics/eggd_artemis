@@ -157,7 +157,7 @@ def generate_all_sample_outputs(
     bed_file_url,
     expiry_date,
     job_output,
-):
+) -> dict:
     """
     Wrapper to call generate_single_sample_output in parallel, returning
     a chongus dict of all sample data to generate the final output xlsx
