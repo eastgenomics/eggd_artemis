@@ -1,14 +1,11 @@
-#!/usr/bin/env python
-# eggd_artemis
+"""Main app entrypoint"""
+
 import concurrent
 import os
-import re
 import dxpy
-import json
 import datetime
 import logging
 from collections import defaultdict
-from copy import deepcopy
 
 from glob import glob
 import pip
@@ -17,8 +14,7 @@ pip.main(["install", "--no-index", "--no-deps", *glob("packages/*")])
 
 
 from mergedeep import merge
-from openpyxl.styles import DEFAULT_FONT, Font, Protection
-import pandas as pd
+
 
 from utils.io import (
     make_cnv_session,
