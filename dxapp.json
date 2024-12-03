@@ -3,7 +3,7 @@
   "title": "eggd_artemis",
   "summary": "Gathers required files and creates file containing urls for them",
   "dxapi": "1.0.0",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "inputSpec": [
     {
       "name": "snv_path",
@@ -85,7 +85,7 @@
       }
     },
     "interpreter": "python3",
-    "file": "src/eggd_artemis.py",
+    "file": "resources/home/dnanexus/eggd_artemis.py",
     "distribution": "Ubuntu",
     "release": "20.04",
     "version": "0"
