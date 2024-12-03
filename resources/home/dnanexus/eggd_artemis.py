@@ -28,6 +28,7 @@ from utils.util_functions import (
 def main(
     url_duration,
     build,
+    select_tracks=None,
     lock_cells=True,
     snv_path=None,
     cnv_path=None,
@@ -139,6 +140,7 @@ def main(
         expiry_date=expiry_date,
         job_output=job_output_folder,
         build=build,
+        select_tracks=select_tracks,
     )
 
     multiqc_url = make_url(multiqc_report, project_id, url_duration)

@@ -105,9 +105,12 @@ def generate_single_sample_output(
     expiry_date,
     job_output,
     build,
+    select_tracks,
 ) -> dict:
     """
     Generates all URLs and session file for a given sample
+
+    TODO - update the format of this docstring for consistency
 
     Parameters
     ----------
@@ -127,6 +130,8 @@ def generate_single_sample_output(
         output folder set for job
     build : int
         genome build to add reference files to the session file for
+    select_tracks (str): comma separated string of IGV reference tracks to select
+
 
     Returns
     -------
@@ -213,6 +218,7 @@ def generate_single_sample_output(
                     job_output,
                     expiry_date,
                     build,
+                    select_tracks,
                 )
                 cnv_session_url = make_url(
                     cnv_session, dx_project, url_duration
@@ -248,6 +254,7 @@ def generate_all_sample_outputs(
     expiry_date,
     job_output,
     build,
+    select_tracks,
 ) -> dict:
     """
     Wrapper to call generate_single_sample_output in parallel, returning
@@ -262,6 +269,7 @@ def generate_all_sample_outputs(
     expiry_date (str): date of URL expiration
     job_output (str): output folder set for job
     build (int): genome build to add reference files to the session file for
+    select_tracks (str): comma separated string of IGV reference tracks to select
 
     Returns
     -------
@@ -284,6 +292,7 @@ def generate_all_sample_outputs(
                 expiry_date,
                 job_output,
                 build,
+                select_tracks,
             ): sample
             for sample, sample_data in file_data.items()
         }

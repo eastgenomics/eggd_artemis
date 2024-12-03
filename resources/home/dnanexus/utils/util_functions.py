@@ -118,6 +118,34 @@ def initialise_project() -> Tuple[str, str, str]:
     return project_name, project_id, job_output
 
 
+def filter_reference_tracks(select_tracks, reference_tracks) -> list:
+    """
+    Filter the reference tracks from the defaults.py URL tracks list by
+    those provided to the input select tracks
+
+    Args:
+        select_tracks (str): comma separated string of IGV reference
+            tracks to select
+        reference_tracks (list): list of reference track URL dicts
+
+    Returns:
+        reference_tracks (list): filtered list of reference tracks
+    """
+    select_tracks = [x.strip().lower() for x in select_tracks.split()]
+    available_reference_tracks = [x["name"].lower() for x in reference_tracks]
+
+    invalid_tracks = [
+        x for x in select_tracks if x not in available_reference_tracks
+    ]
+    if invalid_tracks:
+        raise ValueError(
+            "Invalid track names provided to select from build URL"
+            f" tracks: {invalid_tracks}"
+        )
+
+    return [x for x in reference_tracks if x["name"].lower() in select_tracks]
+
+
 def set_order_map(snv_only=False) -> dict:
     """Set the order of the session depending on input
 
