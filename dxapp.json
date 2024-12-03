@@ -85,7 +85,7 @@
       }
     },
     "interpreter": "python3",
-    "file": "src/eggd_artemis.py",
+    "file": "resources/home/dnanexus/eggd_artemis.py",
     "distribution": "Ubuntu",
     "release": "20.04",
     "version": "0"
