@@ -104,6 +104,7 @@ def generate_single_sample_output(
     bed_url,
     expiry_date,
     job_output,
+    build,
 ) -> dict:
     """
     Generates all URLs and session file for a given sample
@@ -124,6 +125,8 @@ def generate_single_sample_output(
         date of URL expiration
     job_output : str
         output folder set for job
+    build : int
+        genome build to add reference files to the session file for
 
     Returns
     -------
@@ -209,6 +212,7 @@ def generate_single_sample_output(
                     bed_url,
                     job_output,
                     expiry_date,
+                    build,
                 )
                 cnv_session_url = make_url(
                     cnv_session, dx_project, url_duration
@@ -243,10 +247,27 @@ def generate_all_sample_outputs(
     bed_file_url,
     expiry_date,
     job_output,
+    build,
 ) -> dict:
     """
     Wrapper to call generate_single_sample_output in parallel, returning
     a chongus dict of all sample data to generate the final output xlsx
+
+    Args:
+    sample (str): sample name
+    sample_data (dict): file IDs of sample related files
+    url_duration (int): URL duration in seconds
+    ex_intervals_url (str): URL of excluded intervals file
+    bed_url (str): URL of bed file
+    expiry_date (str): date of URL expiration
+    job_output (str): output folder set for job
+    build (int): genome build to add reference files to the session file for
+
+    Returns
+    -------
+    outputs : dict
+        dict of sample outputs (i.e. URLs/dataframes)
+
     """
     all_sample_outputs = {}
 
@@ -262,6 +283,7 @@ def generate_all_sample_outputs(
                 bed_file_url,
                 expiry_date,
                 job_output,
+                build,
             ): sample
             for sample, sample_data in file_data.items()
         }

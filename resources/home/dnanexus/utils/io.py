@@ -5,9 +5,11 @@ import json
 import re
 
 import dxpy
+from mergedeep import merge, Strategy
 from openpyxl.styles import DEFAULT_FONT, Font, Protection
 import pandas as pd
 
+from .defaults import build_37_urls, build_38_urls
 from .util_functions import set_order_map
 
 
@@ -22,8 +24,10 @@ def make_cnv_session(
     targets_url,
     job_output,
     expiry_date,
+    build,
 ) -> str:
-    """Create a session file for IGV
+    """
+    Create a session file for IGV
 
     Args:
         sessions_list (list): list of session files to upload in the end
@@ -37,15 +41,27 @@ def make_cnv_session(
         targets_url (string): URL of the targets file
         job_output (str) : output folder set for job
         expiry_date (string): date of expiry of file created
+        build (int): genome build to add reference files to the session file for
 
     Returns:
         session_file (string): IGV session file URL
+
+    Raises:
+        RuntimeError: Raised if invalid build param provided
     """
     order_map = set_order_map()
 
-    # Copy template to avoid overwriting
     with open("/home/dnanexus/cnv-template.json") as fh:
         template = json.load(fh)
+
+    if build == 37:
+        template = merge(template, build_37_urls, strategy=Strategy.ADDITIVE)
+    elif build == 38:
+        template = merge(template, build_38_urls, strategy=Strategy.ADDITIVE)
+    else:
+        raise RuntimeError(
+            f"Invalid build param given ({build}), must be one of 37 or 38"
+        )
 
     template_copy = deepcopy(template)
 

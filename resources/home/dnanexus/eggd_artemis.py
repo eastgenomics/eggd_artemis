@@ -27,6 +27,7 @@ from utils.util_functions import (
 @dxpy.entry_point("main")
 def main(
     url_duration,
+    build,
     lock_cells=True,
     snv_path=None,
     cnv_path=None,
@@ -137,6 +138,7 @@ def main(
         bed_file_url=bed_file_url,
         expiry_date=expiry_date,
         job_output=job_output_folder,
+        build=build,
     )
 
     multiqc_url = make_url(multiqc_report, project_id, url_duration)
