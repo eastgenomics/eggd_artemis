@@ -10,7 +10,11 @@ from openpyxl.styles import DEFAULT_FONT, Font, Protection
 import pandas as pd
 
 from .defaults import build_37_urls, build_38_urls
-from .util_functions import filter_reference_tracks, set_order_map
+from .util_functions import (
+    check_session_track_order,
+    filter_reference_tracks,
+    set_order_map,
+)
 
 
 def make_cnv_session(
@@ -76,7 +80,11 @@ def make_cnv_session(
             reference_tracks=reference_urls["tracks"],
         )
 
-    template = merge(template, build_38_urls, strategy=Strategy.ADDITIVE)
+    template = merge(template, reference_urls, strategy=Strategy.ADDITIVE)
+
+    template["tracks"] = check_session_track_order(
+        session_tracks=template["tracks"]
+    )
 
     template_copy = deepcopy(template)
 

@@ -149,6 +149,38 @@ def filter_reference_tracks(select_tracks, reference_tracks) -> list:
     return [x for x in reference_tracks if x["name"].lower() in select_tracks]
 
 
+def check_session_track_order(session_tracks) -> list:
+    """
+    Ensures that each track for the IGV session has the `order` key set,
+    this ensures the order of tracks displaying is consistent.
+
+    For any that are not defined, we will set it to the index within the
+    track list or igv.js will shuffle them around.
+    """
+    orders_set = [x.get("order") for x in session_tracks]
+
+    if all(orders_set):
+        return session_tracks
+
+    print("setting order")
+
+    max_set_order = max([x for x in orders_set if x])
+    ordered_tracks = []
+
+    for track in session_tracks:
+        if not track.get("order"):
+            print("unordered track")
+            max_set_order += 1
+
+            print(track)
+            print(max_set_order)
+            track["order"] = max_set_order
+
+        ordered_tracks.append(track)
+
+    return ordered_tracks
+
+
 def set_order_map(snv_only=False) -> dict:
     """Set the order of the session depending on input
 
