@@ -1,0 +1,3 @@
+[lint]
+
+ignore = ["COM812"]

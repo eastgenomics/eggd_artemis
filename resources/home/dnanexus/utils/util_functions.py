@@ -1,7 +1,7 @@
 """General utility functions"""
 
+from __future__ import annotations
 import os
-from typing import Tuple, Union
 
 import dxpy
 
@@ -70,8 +70,9 @@ def add_session_file_ids_to_job_output(all_sample_outputs, job_output) -> dict:
     return job_output
 
 
-def get_excluded_intervals(gcnv_output_dict) -> Union[str, None]:
-    """Get the excluded regions file from the gcnv dictionary
+def get_excluded_intervals(gcnv_output_dict) -> str | None:
+    """
+    Get the excluded regions file from the gcnv dictionary
 
     Args:
         gcnv_output_dict (dict): dictionary of gcnv i/o files
@@ -86,7 +87,7 @@ def get_excluded_intervals(gcnv_output_dict) -> Union[str, None]:
     return None
 
 
-def initialise_project() -> Tuple[str, str, str]:
+def initialise_project() -> tuple[str, str, str]:
     """
     Set required project data, get the project name and destination for
     downstream naming
@@ -118,8 +119,73 @@ def initialise_project() -> Tuple[str, str, str]:
     return project_name, project_id, job_output
 
 
+def filter_reference_tracks(select_tracks, reference_tracks) -> list:
+    """
+    Filter the reference tracks from the defaults.py URL tracks list by
+    those provided to the input select tracks
+
+    Args:
+        select_tracks (str): comma separated string of IGV reference
+            tracks to select
+        reference_tracks (list): list of reference track URL dicts
+
+    Returns:
+        reference_tracks (list): filtered list of reference tracks
+
+    Raises:
+        ValueError: raised if invalid track names provided to select_tracks
+    """
+    select_tracks = [x.strip().lower() for x in select_tracks.split(",")]
+    available_reference_tracks = [x["name"].lower() for x in reference_tracks]
+
+    invalid_tracks = [
+        x for x in select_tracks if x not in available_reference_tracks
+    ]
+    if invalid_tracks:
+        raise ValueError(
+            "Invalid track names provided to select from build URL tracks:"
+            f" {invalid_tracks}\nAvailable tracks are:"
+            f" {available_reference_tracks}"
+        )
+
+    return [x for x in reference_tracks if x["name"].lower() in select_tracks]
+
+
+def check_session_track_order(session_tracks) -> list[dict]:
+    """
+    Ensures that each track for the IGV session has the `order` key set,
+    this ensures the order of tracks displaying is consistent.
+
+    For any that are not defined, we will set it to the index within the
+    track list or igv.js will shuffle them around.
+
+    Args:
+        session_tracks (list): list of all track dicts for the session
+
+    Returns:
+        ordered_tracks (list): list of tracks with order key set
+    """
+    orders_set = [x.get("order") for x in session_tracks]
+
+    if all(orders_set):
+        return session_tracks
+
+    max_set_order = max([x for x in orders_set if x])
+    ordered_tracks = []
+
+    for track in session_tracks:
+        if not track.get("order"):
+            max_set_order += 1
+            track["order"] = max_set_order
+
+        ordered_tracks.append(track)
+
+    return ordered_tracks
+
+
 def set_order_map(snv_only=False) -> dict:
-    """Set the order of the session depending on input
+    """
+    Set the order of the session depending on input
 
     Args:
         snv_only (bool, optional): If True, returns snv order map
@@ -183,9 +249,8 @@ def remove_unnecessary_outputs(
                 for file in file_data["SNV"]:
                     if file.get("SNV count") == "Unknown":
                         file["SNV count"] = None
-                    if snv_reports:
-                        if file.get("SNV count") == "0":
-                            file["snv_url"] = "No SNVs post-filtering"
+                    if snv_reports and file.get("SNV count") == "0":
+                        file["snv_url"] = "No SNVs post-filtering"
 
             # Do same for CNV reports, remove CNV report link if
             # cnv_reports option True
@@ -193,9 +258,9 @@ def remove_unnecessary_outputs(
                 for file in file_data["CNV"]:
                     if file.get("CNV count") == "Unknown":
                         file["CNV count"] = None
-                    if cnv_reports:
-                        if file.get("CNV count") == "0":
-                            file["cnv_url"] = "No CNVs detected"
+                    if cnv_reports and file.get("CNV count") == "0":
+                        file["cnv_url"] = "No CNVs detected"
+
                     # Column names/header are read into the first row of df,
                     # therefore if df length is < 2 it contains no data
                     if len(file.get("cnv_excluded_regions_df")) < 2:

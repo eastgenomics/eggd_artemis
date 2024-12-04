@@ -24,7 +24,7 @@
       "label": "Active url duration in seconds (default: 8 weeks)",
       "class": "int",
       "optional": true,
-      "default": 4838400,
+      "default": 15811200,
       "help": ""
     },
     {
@@ -55,6 +55,21 @@
       "optional": true,
       "default": true,
       "help": "Boolean which controls whether to lock any cells for editing if they are populated in the Excel output file"
+    },
+    {
+      "name": "build",
+      "label": "build",
+      "class": "int",
+      "default": 37,
+      "choices": [37, 38],
+      "help": "determines if to use build 37 or 38 reference file links in the session files"
+    },
+    {
+      "name": "select_tracks",
+      "label": "select tracks",
+      "class": "string",
+      "optional": true,
+      "help": "comma separated string of IGV reference tracks to select for including in the IGV session file"
     }
   ],
   "outputSpec": [

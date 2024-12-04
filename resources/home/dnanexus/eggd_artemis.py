@@ -27,6 +27,8 @@ from utils.util_functions import (
 @dxpy.entry_point("main")
 def main(
     url_duration,
+    build,
+    select_tracks=None,
     lock_cells=True,
     snv_path=None,
     cnv_path=None,
@@ -54,7 +56,7 @@ def main(
         if not multiqc_report:
             print(
                 "No MultiQC report given, searching instead "
-                f"with path {snv_path}"
+                f"with path /output/{snv_path.split('/')[2]}"
             )
             multiqc_report = get_multiqc_report(
                 snv_path.split(",")[0], project_id
@@ -83,7 +85,7 @@ def main(
         if not multiqc_report:
             print(
                 "No MultiQC report given, searching instead "
-                f"with path {cnv_path}"
+                f"with path /output/{cnv_path.split('/')[2]}"
             )
             multiqc_report = get_multiqc_report(
                 cnv_path.split(",")[0], project_id
@@ -137,6 +139,8 @@ def main(
         bed_file_url=bed_file_url,
         expiry_date=expiry_date,
         job_output=job_output_folder,
+        build=build,
+        select_tracks=select_tracks,
     )
 
     multiqc_url = make_url(multiqc_report, project_id, url_duration)

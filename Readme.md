@@ -14,6 +14,8 @@ Gathers required files and creates file containing urls to allow file download w
 * `qc_status`[optional]: Input of xlsx file containing agreed QC status for samples in the run
 * `multiqc_report`[optional]: Input of the MultiQC report - if not provided, will search for a MultiQC job in the project to find this
 * `lock_cells`[optional]: Determines whether to protect any populated cells in the output .xlsx from editing (Default=True)
+* `build` [optional]: determines if to use build 37 or 38 reference file links in the session files (default: 37; choices: 37 | 38)
+* `select_tracks` [optional]: comma separated string of reference tracks to include in the IGV sessions file, must be one of the track names defined under the `"tracks"` key for the selected build in [defaults.py](https://github.com/eastgenomics/eggd_artemis/tree/main/resources/home/dnanexus/utils/defaults.py)
 
 ## How does this app work?
 
@@ -40,5 +42,6 @@ Given a list of paths the app finds the appropriate files needed to share with t
 ## Notes
 * This app works specifically with the output of the dias pipeline, specifically expecting the path inputs to be in specific format to identify the MultiQC reports.
 * Please note although both paths are optional, if none are given the app will fail
+* Default genome build URLs to be included in the IGV session files for both build 37 and 38 are provided [defaults.py](https://github.com/eastgenomics/eggd_artemis/tree/main/resources/home/dnanexus/utils/defaults.py)
 
 ## This app was created by East Genomics GLH

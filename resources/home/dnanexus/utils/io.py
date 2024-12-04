@@ -5,10 +5,16 @@ import json
 import re
 
 import dxpy
+from mergedeep import merge, Strategy
 from openpyxl.styles import DEFAULT_FONT, Font, Protection
 import pandas as pd
 
-from .util_functions import set_order_map
+from .defaults import build_37_urls, build_38_urls
+from .util_functions import (
+    check_session_track_order,
+    filter_reference_tracks,
+    set_order_map,
+)
 
 
 def make_cnv_session(
@@ -22,8 +28,11 @@ def make_cnv_session(
     targets_url,
     job_output,
     expiry_date,
+    build,
+    select_tracks,
 ) -> str:
-    """Create a session file for IGV
+    """
+    Create a session file for IGV
 
     Args:
         sessions_list (list): list of session files to upload in the end
@@ -37,15 +46,45 @@ def make_cnv_session(
         targets_url (string): URL of the targets file
         job_output (str) : output folder set for job
         expiry_date (string): date of expiry of file created
+        build (int): genome build to add reference files to the
+            session file for
+        select_tracks (str): comma separated string of IGV reference
+            tracks to select
 
     Returns:
         session_file (string): IGV session file URL
+
+    Raises:
+        RuntimeError: Raised if invalid build param provided
     """
     order_map = set_order_map()
 
-    # Copy template to avoid overwriting
-    with open("/home/dnanexus/cnv-template.json") as fh:
+    with open(
+        "/home/dnanexus/cnv-template.json", encoding="utf-8", mode="r"
+    ) as fh:
         template = json.load(fh)
+
+    if build == 37:
+        reference_urls = build_37_urls
+    elif build == 38:
+        reference_urls = build_38_urls
+    else:
+        raise ValueError(
+            f"Invalid build param given ({build}), must be one of 37 or 38"
+        )
+
+    # check if we're filtering down the reference tracks by those provided
+    if select_tracks:
+        reference_urls["tracks"] = filter_reference_tracks(
+            select_tracks=select_tracks,
+            reference_tracks=reference_urls["tracks"],
+        )
+
+    template = merge(template, reference_urls, strategy=Strategy.ADDITIVE)
+
+    template["tracks"] = check_session_track_order(
+        session_tracks=template["tracks"]
+    )
 
     template_copy = deepcopy(template)
 
@@ -91,9 +130,7 @@ def make_cnv_session(
         wait_on_close=True,
     )
 
-    session_file_id = session_file.get_id()
-
-    return session_file_id
+    return session_file.get_id()
 
 
 def read_excluded_regions_to_df(file_id, project) -> pd.DataFrame:
@@ -296,7 +333,6 @@ def write_output_file(
     sheet.column_dimensions["B"].width = 11
     sheet.column_dimensions["C"].width = 11
     sheet.column_dimensions["D"].width = 11
-    sheet.column_dimensions["E"].width = 11
     sheet.column_dimensions["E"].width = 11
     sheet.column_dimensions["F"].width = 16
     sheet.column_dimensions["G"].width = 12
