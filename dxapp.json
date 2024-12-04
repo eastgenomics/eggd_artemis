@@ -24,7 +24,7 @@
       "label": "Active url duration in seconds (default: 8 weeks)",
       "class": "int",
       "optional": true,
-      "default": 4838400,
+      "default": 15811200,
       "help": ""
     },
     {
