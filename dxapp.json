@@ -61,6 +61,7 @@
       "label": "build",
       "class": "int",
       "default": 37,
+      "choices": [37, 38],
       "help": "determines if to use build 37 or 38 reference file links in the session files"
     },
     {
