@@ -22,7 +22,7 @@ def make_cnv_session(
     targets_url,
     job_output,
     expiry_date,
-):
+) -> str:
     """Create a session file for IGV
 
     Args:
@@ -96,7 +96,7 @@ def make_cnv_session(
     return session_file_id
 
 
-def read_excluded_regions_to_df(file_id, project):
+def read_excluded_regions_to_df(file_id, project) -> pd.DataFrame:
     """
     Read in excluded regions file to a pandas dataframe.
 
@@ -155,7 +155,7 @@ def write_output_file(
     qc_url,
     project_name,
     lock_cells,
-):
+) -> str:
     """
     Writes output xlsx file with all download URLs
 
@@ -175,6 +175,10 @@ def write_output_file(
         DNAnexus project name
     lock_cells : boolean
         determines whether to lock any populated cells for editing
+
+    Returns
+    -------
+    output_xlsx_file (str): filename of the written xlsx file
 
     Outputs
     -------
@@ -361,6 +365,9 @@ def write_output_file(
             if lock_cells:
                 cell[0].protection = Protection(locked=True)
 
-    writer.book.save(f"{project_name}_{today}.xlsx")
+    output_file = f"{project_name}_{today}.xlsx"
+    writer.book.save(output_file)
 
-    print(f"Output written to {project_name}_{today}.xlsx")
+    print(f"Output written to {output_file}")
+
+    return output_file

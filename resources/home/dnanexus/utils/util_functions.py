@@ -1,14 +1,84 @@
 """General utility functions"""
 
+import os
+from typing import Tuple, Union
 
-def get_excluded_intervals(gcnv_output_dict):
+import dxpy
+
+
+def add_session_file_ids_to_job_output(all_sample_outputs, job_output) -> dict:
+    """
+    Search through the all samples output dict for any session file URLs
+    generated and add them to the job output to link to the job output spec
+
+    Example all_sample_outputs format we're looping over:
+    'sample-name': {
+        'sample': 'sample-name',
+        'bam_url': 'url_for_bam',
+        'bai_url':  'url_for_bai',
+        'clinical_indications': {
+            'R141.1': {
+                'SNV': [{
+                    'SNV count': '7',
+                    'coverage_url: '=HYPERLINK("hyperlink", "hyperlink"),
+                    'coverage_summary' : 'coverage summary text',
+                    'snv_url': '=HYPERLINK("hyperlink", "hyperlink"),
+                }],
+                'CNV': [{
+                    'CNV count': '1',
+                    'cnv_bed': 'bed_url',
+                    'cnv_seg': 'seg_url',
+                    'cnv_session_fileid': 'file-XYZ',
+                    'cnv_url': '=HYPERLINK("hyperlink", "hyperlink"),
+                    'cnv_session_url': '=HYPERLINK("hyperlink", "hyperlink"),
+                    'cnv_excluded_regions_df': pd.DataFrame of excluded regions file
+                }]
+            }
+        }
+    }
+
+    Parameters
+    ----------
+    all_sample_outputs : dict
+        dict of all sample output data
+    job_output : dict
+        output mapping dict of the job output
+
+    Returns
+    -------
+    dict
+        job output dict with added session file IDs
+    """
+    session_files = []
+
+    for _, sample_info in all_sample_outputs.items():
+        for clin_ind in sample_info.get("clinical_indications"):
+            if sample_info["clinical_indications"][clin_ind].get("CNV"):
+                for cnv_item in sample_info["clinical_indications"][clin_ind][
+                    "CNV"
+                ]:
+                    session_file_id = cnv_item["cnv_session_fileid"]
+                    session_files.append(session_file_id)
+
+    print(f"Found {len(session_files)} session files to link to job output")
+
+    if session_files:
+        job_output["session_files"] = [
+            dxpy.dxlink(item) for item in session_files
+        ]
+
+    return job_output
+
+
+def get_excluded_intervals(gcnv_output_dict) -> Union[str, None]:
     """Get the excluded regions file from the gcnv dictionary
 
     Args:
         gcnv_output_dict (dict): dictionary of gcnv i/o files
 
     Returns:
-        excluded_file (str): file id of the excluded regions file
+        excluded_file (str | None): file id of the excluded regions file
+            or None if excluded_intervals.bed not found in gCNV output
     """
     for k, v in gcnv_output_dict.items():
         if k.endswith("excluded_intervals.bed"):
@@ -16,7 +86,39 @@ def get_excluded_intervals(gcnv_output_dict):
     return None
 
 
-def set_order_map(snv_only=False):
+def initialise_project() -> Tuple[str, str, str]:
+    """
+    Set required project data, get the project name and destination for
+    downstream naming
+
+    Returns:
+        project_name (str): name of DNAnexus project
+        project_id (str): ID of DNAnexus project
+        job_output (str): destination folder set for the job
+    """
+    project_id = os.environ.get("DX_PROJECT_CONTEXT_ID")
+
+    # Set the environment context to allow upload
+    dxpy.set_workspace_id(project_id)
+
+    # Get output folder set for this job
+    job_output = dxpy.bindings.dxjob.DXJob(
+        os.environ.get("DX_JOB_ID")
+    ).describe()["folder"]
+
+    # Make output folder for job
+    dxpy.api.project_new_folder(
+        project_id, input_params={"folder": job_output, "parents": True}
+    )
+
+    # Get name of project for output naming
+    project_name = dxpy.describe(project_id)["name"]
+    project_name = "_".join(project_name.split("_")[1:-1])
+
+    return project_name, project_id, job_output
+
+
+def set_order_map(snv_only=False) -> dict:
     """Set the order of the session depending on input
 
     Args:
@@ -46,7 +148,9 @@ def set_order_map(snv_only=False):
     return order_map
 
 
-def remove_unnecessary_outputs(all_sample_outputs, snv_reports, cnv_reports):
+def remove_unnecessary_outputs(
+    all_sample_outputs, snv_reports, cnv_reports
+) -> dict:
     """
     Remove links to download Excel reports if there are no variants and remove
     excluded regions dataframe if there are no excluded regions
