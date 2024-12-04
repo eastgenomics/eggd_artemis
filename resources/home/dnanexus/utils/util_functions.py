@@ -71,7 +71,8 @@ def add_session_file_ids_to_job_output(all_sample_outputs, job_output) -> dict:
 
 
 def get_excluded_intervals(gcnv_output_dict) -> Union[str, None]:
-    """Get the excluded regions file from the gcnv dictionary
+    """
+    Get the excluded regions file from the gcnv dictionary
 
     Args:
         gcnv_output_dict (dict): dictionary of gcnv i/o files
@@ -156,6 +157,12 @@ def check_session_track_order(session_tracks) -> list:
 
     For any that are not defined, we will set it to the index within the
     track list or igv.js will shuffle them around.
+
+    Args:
+        session_tracks (list): list of all track dicts for the session
+
+    Returns:
+        ordered_tracks (list): list of tracks with order key set
     """
     orders_set = [x.get("order") for x in session_tracks]
 
@@ -176,7 +183,8 @@ def check_session_track_order(session_tracks) -> list:
 
 
 def set_order_map(snv_only=False) -> dict:
-    """Set the order of the session depending on input
+    """
+    Set the order of the session depending on input
 
     Args:
         snv_only (bool, optional): If True, returns snv order map
