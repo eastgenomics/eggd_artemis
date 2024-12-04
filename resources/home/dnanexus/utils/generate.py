@@ -110,33 +110,20 @@ def generate_single_sample_output(
     """
     Generates all URLs and session file for a given sample
 
-    TODO - update the format of this docstring for consistency
-
-    Parameters
-    ----------
-    sample : str
-        sample name
-    sample_data : dict
-        file IDs of sample related files
-    url_duration : int
-        URL duration in seconds
-    ex_intervals_url : str
-        URL of excluded intervals file
-    bed_url : str
-        URL of bed file
-    expiry_date : str
-        date of URL expiration
-    job_output : str
-        output folder set for job
-    build : int
-        genome build to add reference files to the session file for
-    select_tracks (str): comma separated string of IGV reference tracks to select
+    Args:
+        sample (str): sample name
+        sample_data (dict): file IDs of sample related files
+        url_duration (int): URL duration in seconds
+        ex_intervals_url (str): URL of excluded intervals file
+        bed_url (str): URL of bed file
+        expiry_date (str): date of URL expiration
+        job_output (str): output folder set for job
+        build (int): genome build to add reference files to the session file for
+        select_tracks (str): comma separated string of IGV reference tracks to select
 
 
-    Returns
-    -------
-    outputs : dict
-        dict of sample outputs (i.e. URLs/dataframes)
+    Returns:
+    outputs (dict): dict of sample outputs (i.e. URLs/dataframes)
     """
     dx_project = os.environ.get("DX_PROJECT_CONTEXT_ID")
 
