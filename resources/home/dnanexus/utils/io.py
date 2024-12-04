@@ -69,7 +69,7 @@ def make_cnv_session(
     elif build == 38:
         reference_urls = build_38_urls
     else:
-        raise RuntimeError(
+        raise ValueError(
             f"Invalid build param given ({build}), must be one of 37 or 38"
         )
 
