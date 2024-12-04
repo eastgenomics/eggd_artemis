@@ -240,9 +240,8 @@ def remove_unnecessary_outputs(
                 for file in file_data["SNV"]:
                     if file.get("SNV count") == "Unknown":
                         file["SNV count"] = None
-                    if snv_reports:
-                        if file.get("SNV count") == "0":
-                            file["snv_url"] = "No SNVs post-filtering"
+                    if snv_reports and file.get("SNV count") == "0":
+                        file["snv_url"] = "No SNVs post-filtering"
 
             # Do same for CNV reports, remove CNV report link if
             # cnv_reports option True
@@ -250,9 +249,9 @@ def remove_unnecessary_outputs(
                 for file in file_data["CNV"]:
                     if file.get("CNV count") == "Unknown":
                         file["CNV count"] = None
-                    if cnv_reports:
-                        if file.get("CNV count") == "0":
-                            file["cnv_url"] = "No CNVs detected"
+                    if cnv_reports and file.get("CNV count") == "0":
+                        file["cnv_url"] = "No CNVs detected"
+
                     # Column names/header are read into the first row of df,
                     # therefore if df length is < 2 it contains no data
                     if len(file.get("cnv_excluded_regions_df")) < 2:
