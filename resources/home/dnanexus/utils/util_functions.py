@@ -143,8 +143,9 @@ def filter_reference_tracks(select_tracks, reference_tracks) -> list:
     ]
     if invalid_tracks:
         raise ValueError(
-            "Invalid track names provided to select from build URL"
-            f" tracks: {invalid_tracks}"
+            "Invalid track names provided to select from build URL tracks:"
+            f" {invalid_tracks}\nAvailable tracks are:"
+            f" {available_reference_tracks}"
         )
 
     return [x for x in reference_tracks if x["name"].lower() in select_tracks]
