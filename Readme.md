@@ -42,6 +42,6 @@ Given a list of paths the app finds the appropriate files needed to share with t
 ## Notes
 * This app works specifically with the output of the dias pipeline, specifically expecting the path inputs to be in specific format to identify the MultiQC reports.
 * Please note although both paths are optional, if none are given the app will fail
-* Default genome build URLs to be included in the IGV session files for both build 37 and 38 are provided [here](https://github.com/eastgenomics/eggd_artemis/tree/main/resources/home/dnanexus/utils/defaults.py)
+* Default genome build URLs to be included in the IGV session files for both build 37 and 38 are provided [defaults.py](https://github.com/eastgenomics/eggd_artemis/tree/main/resources/home/dnanexus/utils/defaults.py)
 
 ## This app was created by East Genomics GLH
