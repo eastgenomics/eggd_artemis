@@ -1,7 +1,7 @@
 """General utility functions"""
 
 import os
-from typing import Tuple, Union
+from typing import List, Tuple, Union
 
 import dxpy
 
@@ -151,7 +151,7 @@ def filter_reference_tracks(select_tracks, reference_tracks) -> list:
     return [x for x in reference_tracks if x["name"].lower() in select_tracks]
 
 
-def check_session_track_order(session_tracks) -> list:
+def check_session_track_order(session_tracks) -> List[dict]:
     """
     Ensures that each track for the IGV session has the `order` key set,
     this ensures the order of tracks displaying is consistent.
