@@ -56,7 +56,7 @@ def main(
         if not multiqc_report:
             print(
                 "No MultiQC report given, searching instead "
-                f"with path {snv_path}"
+                f"with path /output/{snv_path.split('/')[2]}"
             )
             multiqc_report = get_multiqc_report(
                 snv_path.split(",")[0], project_id
@@ -85,7 +85,7 @@ def main(
         if not multiqc_report:
             print(
                 "No MultiQC report given, searching instead "
-                f"with path {cnv_path}"
+                f"with path /output/{cnv_path.split('/')[2]}"
             )
             multiqc_report = get_multiqc_report(
                 cnv_path.split(",")[0], project_id
