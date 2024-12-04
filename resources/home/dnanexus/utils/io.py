@@ -130,9 +130,7 @@ def make_cnv_session(
         wait_on_close=True,
     )
 
-    session_file_id = session_file.get_id()
-
-    return session_file_id
+    return session_file.get_id()
 
 
 def read_excluded_regions_to_df(file_id, project) -> pd.DataFrame:
