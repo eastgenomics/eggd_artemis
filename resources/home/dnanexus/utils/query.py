@@ -424,7 +424,7 @@ def find_snv_files(reports) -> dict:
         if not summary_text:
             print(
                 "No summary .txt file found in output of eggd_athena stage"
-                f" for SNV reports workflow ({parent_details})"
+                f" for SNV reports workflow ({parent_analysis})"
             )
 
         # Extract the sention job id from the vcf metadata
