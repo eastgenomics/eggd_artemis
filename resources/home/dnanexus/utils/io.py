@@ -336,7 +336,6 @@ def write_output_file(
     sheet.column_dimensions["C"].width = 11
     sheet.column_dimensions["D"].width = 11
     sheet.column_dimensions["E"].width = 11
-    sheet.column_dimensions["E"].width = 11
     sheet.column_dimensions["F"].width = 16
     sheet.column_dimensions["G"].width = 12
     sheet.column_dimensions["H"].width = 16
