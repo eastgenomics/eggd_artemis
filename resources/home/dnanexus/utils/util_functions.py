@@ -1,7 +1,7 @@
 """General utility functions"""
 
+from __future__ import annotations
 import os
-from typing import List, Tuple, Union
 
 import dxpy
 
@@ -70,7 +70,7 @@ def add_session_file_ids_to_job_output(all_sample_outputs, job_output) -> dict:
     return job_output
 
 
-def get_excluded_intervals(gcnv_output_dict) -> Union[str, None]:
+def get_excluded_intervals(gcnv_output_dict) -> str | None:
     """
     Get the excluded regions file from the gcnv dictionary
 
@@ -87,7 +87,7 @@ def get_excluded_intervals(gcnv_output_dict) -> Union[str, None]:
     return None
 
 
-def initialise_project() -> Tuple[str, str, str]:
+def initialise_project() -> tuple[str, str, str]:
     """
     Set required project data, get the project name and destination for
     downstream naming
@@ -151,7 +151,7 @@ def filter_reference_tracks(select_tracks, reference_tracks) -> list:
     return [x for x in reference_tracks if x["name"].lower() in select_tracks]
 
 
-def check_session_track_order(session_tracks) -> List[dict]:
+def check_session_track_order(session_tracks) -> list[dict]:
     """
     Ensures that each track for the IGV session has the `order` key set,
     this ensures the order of tracks displaying is consistent.
