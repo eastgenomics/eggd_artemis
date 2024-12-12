@@ -42,21 +42,22 @@ build_38_urls = {
     },
     "tracks": [
         {
+            "name": "MANE Transcripts",
+            "format": "bigbed",
+            "url": "https://hgdownload.soe.ucsc.edu/gbdb/hg38/mane/mane.bb",
+            "visibilityWindow": -1,
+            "type": "annotation",
+            "height": 50,
+            "color": "rgb(255, 41, 135)",
+        },
+        {
             "name": "Refseq Select",
             "format": "refgene",
             "url": "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/ncbiRefSeqSelect.txt.gz",
             "indexed": False,
             "infoURL": "https://www.ncbi.nlm.nih.gov/gene/?term=$$",
             "type": "annotation",
-            "height": 150,
-        },
-        {
-            "name": "MANE Transcripts",
-            "format": "bigbed",
-            "url": "https://hgdownload.soe.ucsc.edu/gbdb/hg38/mane/mane.bb",
-            "visibilityWindow": -1,
-            "type": "annotation",
-            "height": 150,
+            "height": 50,
         },
         {
             "name": "Refseq All",
