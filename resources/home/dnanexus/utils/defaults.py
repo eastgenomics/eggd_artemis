@@ -52,7 +52,7 @@ build_38_urls = {
             "visibilityWindow": -1,
             "type": "annotation",
             "height": 50,
-            "color": "rgb(255, 41, 135)",
+            "color": "rgb(185, 8, 8)",
         },
         {
             "name": "Refseq Select",
@@ -70,7 +70,7 @@ build_38_urls = {
             "format": "refgene",
             "url": "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/database/ncbiRefSeq.txt.gz",
             "type": "annotation",
-            "height": 50,
+            "height": 100,
         },
     ],
 }
