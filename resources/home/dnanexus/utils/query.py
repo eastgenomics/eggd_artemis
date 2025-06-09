@@ -428,14 +428,14 @@ def find_snv_files(reports) -> dict:
             )
 
         # Extract the sention job id from the vcf metadata
-        sention_job_id = dxpy.describe(vcf_file)["createdBy"]["job"]
-        sentieon_details = dxpy.bindings.dxjob.DXJob(
-            dxid=sention_job_id
+        additional_calling_job_id = dxpy.describe(vcf_file)["createdBy"]["job"]
+        additional_calling_details = dxpy.bindings.dxjob.DXJob(
+            dxid=additional_calling_job_id
         ).describe()
 
         # Get bam & bai job id from sention job metadata
-        mappings_bam = sentieon_details["output"]["mappings_bam"]
-        mappings_bai = sentieon_details["output"]["mappings_bam_bai"]
+        mappings_bam = additional_calling_details["output"]["input_bam"]
+        mappings_bai = additional_calling_details["output"]["input_bai"]
 
         # Store in dictionary to return
         data = {
