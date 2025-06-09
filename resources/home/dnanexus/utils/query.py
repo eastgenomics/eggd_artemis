@@ -434,8 +434,29 @@ def find_snv_files(reports) -> dict:
         ).describe()
 
         # Get bam & bai job id from sention job metadata
-        mappings_bam = additional_calling_details["output"]["input_bam"]
-        mappings_bai = additional_calling_details["output"]["input_bai"]
+        try:
+            mappings_bam_stage = parent_details["output"]["stage-sentieon_dnaseq.mappings_bam"]
+            mappings_bam = mappings_bam_stage.get("$dnanexus_link", None)
+            mappings_bai_stage = parent_details["output"]["stage-sentieon_dnaseq.mappings_bam_bai"]
+            mappings_bai = mappings_bai_stage.get("$dnanexus_link", None)
+        except KeyError:
+            print(
+                "No mappings bam or bai found in output of sentieon_dnaseq stage"
+                f" for SNV reports workflow ({parent_analysis})"
+            )
+            mappings_bam = additional_calling_details["input"][
+                "input_bam"
+            ]
+            mappings_bai = additional_calling_details["input"]["input_bai"]
+        if not mappings_bam or not mappings_bai:
+            # If no bam or bai found in additional calling job metadata
+            # then set to None and print warning
+            mappings_bam = mappings_bai = None
+            print(
+                "No input BAM or BAI found in additional calling job metadata"
+                f" ({additional_calling_job_id}) for SNV reports workflow"
+                f" ({parent_analysis})"
+            )
 
         # Store in dictionary to return
         data = {
