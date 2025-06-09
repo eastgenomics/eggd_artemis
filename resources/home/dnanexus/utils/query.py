@@ -427,27 +427,43 @@ def find_snv_files(reports) -> dict:
                 f" for SNV reports workflow ({parent_analysis})"
             )
 
-        # Extract the sention job id from the vcf metadata
+        # Extract the additional regions calling job id from the vcf metadata
         additional_calling_job_id = dxpy.describe(vcf_file)["createdBy"]["job"]
         additional_calling_details = dxpy.bindings.dxjob.DXJob(
             dxid=additional_calling_job_id
         ).describe()
-
-        # Get bam & bai job id from sention job metadata
-        try:
-            mappings_bam_stage = parent_details["output"]["stage-sentieon_dnaseq.mappings_bam"]
-            mappings_bam = mappings_bam_stage.get("$dnanexus_link", None)
-            mappings_bai_stage = parent_details["output"]["stage-sentieon_dnaseq.mappings_bam_bai"]
-            mappings_bai = mappings_bai_stage.get("$dnanexus_link", None)
-        except KeyError:
-            print(
-                "No mappings bam or bai found in output of sentieon_dnaseq stage"
-                f" for SNV reports workflow ({parent_analysis})"
-            )
-            mappings_bam = additional_calling_details["input"][
-                "input_bam"
-            ]
-            mappings_bai = additional_calling_details["input"]["input_bai"]
+        # Get the parent analysis of the additional calling job
+        additional_calling_analysis = additional_calling_details.get(
+            "parentAnalysis", None
+        )
+        if additional_calling_analysis:
+            dias_single_analysis_details = dxpy.bindings.dxanalysis.DXAnalysis(
+                dxid=additional_calling_analysis
+            ).describe()
+            # Get bam & bai job id from sention job metadata
+            try:
+                mappings_bam_stage = dias_single_analysis_details["output"]["stage-sentieon_dnaseq.mappings_bam"]
+                mappings_bam = mappings_bam_stage.get("$dnanexus_link", None)
+                mappings_bai_stage = dias_single_analysis_details["output"]["stage-sentieon_dnaseq.mappings_bam_bai"]
+                mappings_bai = mappings_bai_stage.get("$dnanexus_link", None)
+            except KeyError:
+                print(
+                    "No mappings bam or bai found in output of sentieon_dnaseq stage"
+                    f" for SNV reports workflow ({parent_analysis})"
+                )
+        else:
+            try:
+                mappings_bam = additional_calling_details["input"][
+                    "input_bam"
+                ]
+                mappings_bai = additional_calling_details["input"]["input_bai"]
+            except KeyError:
+                print(
+                    "No mappings bam or bai found in input of additional calling job"
+                    f" ({additional_calling_job_id}) for SNV reports workflow"
+                    f" ({parent_analysis})"
+                )
+                mappings_bam = mappings_bai = None
         if not mappings_bam or not mappings_bai:
             # If no bam or bai found in additional calling job metadata
             # then set to None and print warning
