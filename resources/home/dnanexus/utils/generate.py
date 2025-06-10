@@ -18,7 +18,7 @@ from .query import (
 from .util_functions import get_excluded_intervals
 
 
-def gather_snv_data(snv_paths, dx_project) -> dict:
+def gather_snv_data(snv_paths, dx_project, build) -> dict:
     """
     Finds all xlsx reports and the associated job input files using
     query.find_snv_files from the given SNV path(s)
@@ -26,6 +26,7 @@ def gather_snv_data(snv_paths, dx_project) -> dict:
     Args:
         snv_paths (str): comma separated string of SNV path(s) to search
         dx_project (str) : DNAnexus project ID to search
+        build (int): genome build used 37/38 to determine search logic for SNV files.
 
     Returns:
         snv_data (dict): dict of all sample SNV file data
@@ -44,7 +45,7 @@ def gather_snv_data(snv_paths, dx_project) -> dict:
             )
         )
 
-        snv_files = find_snv_files(snv_reports)
+        snv_files = find_snv_files(snv_reports, build)
         merge(snv_data, snv_files)
 
     print(f"Size of snv data dict: {len(snv_data.keys())}")

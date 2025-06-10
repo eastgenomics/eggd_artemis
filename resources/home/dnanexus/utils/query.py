@@ -326,12 +326,13 @@ def get_cnv_file_ids(reports, gcnv_dict) -> dict:
     return cnv_data
 
 
-def find_snv_files(reports) -> dict:
+def find_snv_files(reports, build) -> dict:
     """
     Gather files related to SNV reports
 
     Args:
         reports (list): List of SNV report dxpy describe dicts
+        build (int): Genome build used for SNV calling, e.g. 37 or 38.
 
     Returns:
         snv_data (dict): Nested dictionary of files with sample name
@@ -368,15 +369,16 @@ def find_snv_files(reports) -> dict:
     }
     """
 
-    def _find(report):
+    def _find(report, build):
         """
         Find files for single sample
 
         Args:
             report (dict): dx describe return for single sample
+            build (int): Genome build used for SNV calling, e.g. 37 or 38.
 
         Returns:
-            data (dict): files found for sample
+            data (dict): files found for sample#
         """
         # Get sample name
         sample = report["describe"]["name"].split("_")[0]
@@ -393,86 +395,93 @@ def find_snv_files(reports) -> dict:
         job_id = report["describe"]["createdBy"]["job"]
 
         # Get the workflow id that included the job
-        parent_analysis = dxpy.bindings.dxjob.DXJob(dxid=job_id).describe()[
+        report_parent_analysis = dxpy.bindings.dxjob.DXJob(dxid=job_id).describe()[
             "parentAnalysis"
         ]
 
         # Get the vcf file id and athena coverage file id
-        parent_details = dxpy.bindings.dxanalysis.DXAnalysis(
-            dxid=parent_analysis
+        report_parent_details = dxpy.bindings.dxanalysis.DXAnalysis(
+            dxid=report_parent_analysis
         ).describe()
         try:
-            vcf_file = parent_details["input"]["stage-rpt_vep.vcf"]
+            vcf_file = report_parent_details["input"]["stage-rpt_vep.vcf"]
         except KeyError:
-            vcf_file = parent_details["input"][
+            vcf_file = report_parent_details["input"][
                 "stage-G9Q0jzQ4vyJ3x37X4KBKXZ5v.vcf"
             ]
         try:
-            coverage_report = parent_details["output"][
+            coverage_report = report_parent_details["output"][
                 "stage-rpt_athena.report"
             ]
         except KeyError:
-            coverage_report = parent_details["output"][
+            coverage_report = report_parent_details["output"][
                 "stage-Fyq5z18433GfYZbp3vX1KqjB.report"
             ]
 
         summary_text = (
-            parent_details.get("output", {})
+            report_parent_details.get("output", {})
             .get("stage-rpt_athena.summary_text", {})
             .get("$dnanexus_link")
         )
         if not summary_text:
             print(
                 "No summary .txt file found in output of eggd_athena stage"
-                f" for SNV reports workflow ({parent_analysis})"
+                f" for SNV reports workflow ({report_parent_analysis})"
             )
-
+        # Logic for extracting bam and bai files
+        mappings_bam = mappings_bai = None
         # Extract the additional regions calling job id from the vcf metadata
-        additional_calling_job_id = dxpy.describe(vcf_file)["createdBy"]["job"]
-        additional_calling_details = dxpy.bindings.dxjob.DXJob(
-            dxid=additional_calling_job_id
-        ).describe()
-        # Get the parent analysis of the additional calling job
-        additional_calling_analysis = additional_calling_details.get(
-            "parentAnalysis", None
-        )
-        if additional_calling_analysis:
-            dias_single_analysis_details = dxpy.bindings.dxanalysis.DXAnalysis(
-                dxid=additional_calling_analysis
+        if build == 38:
+            # For genome build 38, the additional calling job is stored in the
+            # vcf file metadata
+            additional_calling_job_id = dxpy.describe(vcf_file)["createdBy"][
+                "job"
+            ]
+            if not additional_calling_job_id:
+                print(
+                    "No additional calling job id found in vcf file metadata. "
+                    "Assuming the vcf was created by a sentieon job."
+                )
+            else:
+                parent_vcf_job_details = dxpy.bindings.dxjob.DXJob(
+                    dxid=additional_calling_job_id
+                ).describe()
+        else:
+            # If the vcf file was created by a sentieon job, we can find the
+            # sentieon job id from the vcf file metadata
+            sentieon_job_id = dxpy.describe(vcf_file).get(
+                "createdBy", {}
+            ).get("job", None)
+            if not sentieon_job_id:
+                print("No sentieon job id found in vcf file metadata.")
+            else:
+                parent_vcf_job_details = dxpy.bindings.dxjob.DXJob(
+                    dxid=sentieon_job_id
+                ).describe()
+
+        parent_dias_single_analysis = (
+            parent_vcf_job_details.get("parentAnalysis", None)
+            )
+        dias_single_analysis_details = dxpy.bindings.dxanalysis.DXAnalysis(
+                dxid=parent_dias_single_analysis
             ).describe()
+
+        if dias_single_analysis_details:
             # Get bam & bai job id from sention job metadata
             try:
                 mappings_bam_stage = dias_single_analysis_details["output"]["stage-sentieon_dnaseq.mappings_bam"]
                 mappings_bam = mappings_bam_stage.get("$dnanexus_link", None)
                 mappings_bai_stage = dias_single_analysis_details["output"]["stage-sentieon_dnaseq.mappings_bam_bai"]
                 mappings_bai = mappings_bai_stage.get("$dnanexus_link", None)
-            except KeyError:
+            except KeyError as err:
                 print(
                     "No mappings bam or bai found in output of sentieon_dnaseq stage"
-                    f" for SNV reports workflow ({parent_analysis})"
+                    f" for dias single workflow ({parent_dias_single_analysis})"
                 )
+                raise err
         else:
-            try:
-                mappings_bam = additional_calling_details["input"][
-                    "input_bam"
-                ]
-                mappings_bai = additional_calling_details["input"]["input_bai"]
-            except KeyError:
-                print(
-                    "No mappings bam or bai found in input of additional calling job"
-                    f" ({additional_calling_job_id}) for SNV reports workflow"
-                    f" ({parent_analysis})"
-                )
-                mappings_bam = mappings_bai = None
-        if not mappings_bam or not mappings_bai:
-            # If no bam or bai found in additional calling job metadata
-            # then set to None and print warning
-            mappings_bam = mappings_bai = None
-            print(
-                "No input BAM or BAI found in additional calling job metadata"
-                f" ({additional_calling_job_id}) for SNV reports workflow"
-                f" ({parent_analysis})"
-            )
+            # If no parent analysis found
+            print("No parent analysis found for dias single workflow.")
 
         # Store in dictionary to return
         data = {
@@ -495,6 +504,7 @@ def find_snv_files(reports) -> dict:
 
         return data
 
+    # Create a nested defaultdict to store SNV data
     snv_data = defaultdict(
         lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     )
@@ -502,7 +512,7 @@ def find_snv_files(reports) -> dict:
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
         # submit jobs mapping each id to describe call
         concurrent_jobs = {
-            executor.submit(_find, report): report for report in reports
+            executor.submit(_find, report, build): report for report in reports
         }
 
         for future in concurrent.futures.as_completed(concurrent_jobs):
@@ -529,5 +539,7 @@ def find_snv_files(reports) -> dict:
                 print(
                     f"Error getting data for {concurrent_jobs[future]}: {exc}"
                 )
+                # Propagate the exception to the caller so doesn't silently fail.
+                raise exc
 
     return snv_data

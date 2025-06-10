@@ -44,13 +44,19 @@ def main(
 
     project_name, project_id, job_output_folder = initialise_project()
 
+    # Check if the build is valid
+    if build not in [37, 38]:
+        err = f"Invalid build: {build}. Must be 37 or 38."
+        logger.error(err)
+        raise ValueError(err)
+
     snv_data = {}
     cnv_data = {}
 
     # Gather required SNV files if SNV path is provided
     if snv_path:
         logger.info("Gathering Small variant files")
-        snv_data = gather_snv_data(snv_paths=snv_path, dx_project=project_id)
+        snv_data = gather_snv_data(snv_paths=snv_path, dx_project=project_id, build=build)
 
         # If multiqc report not given, search for multiqc report
         if not multiqc_report:
