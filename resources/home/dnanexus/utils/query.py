@@ -451,6 +451,7 @@ def find_snv_files(reports, build) -> dict:
             )
         # Logic for extracting bam and bai files
         mappings_bam = mappings_bai = None
+        parent_vcf_job_details = {}
         # Extract the additional regions calling job id from the vcf metadata
         if build == 38:
             # For genome build 38, the additional calling job is stored in the
@@ -473,12 +474,9 @@ def find_snv_files(reports, build) -> dict:
             sentieon_job_id = dxpy.describe(vcf_file).get(
                 "createdBy", {}
             ).get("job", None)
-            if not sentieon_job_id:
-                print("No sentieon job id found in vcf file metadata.")
-            else:
-                parent_vcf_job_details = dxpy.bindings.dxjob.DXJob(
+            parent_vcf_job_details = dxpy.bindings.dxjob.DXJob(
                     dxid=sentieon_job_id
-                ).describe()
+            ).describe()
 
         parent_dias_single_analysis = (
             parent_vcf_job_details.get("parentAnalysis", None)
