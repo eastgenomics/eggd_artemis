@@ -322,6 +322,8 @@ def get_cnv_file_ids(reports, gcnv_dict) -> dict:
                 print(
                     f"Error getting data for {concurrent_jobs[future]}: {exc}"
                 )
+                # Propagate the exception to the caller so doesn't silently fail.
+                raise exc
 
     return cnv_data
 
