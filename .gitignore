@@ -1,1 +1,11 @@
 *pyc
+/venv
+/__pycache__/
+# Ignore Python bytecode files
+# Ignore virtual environment directories
+# Ignore cache directories
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints
+# Ignore log files
+*.log
+
