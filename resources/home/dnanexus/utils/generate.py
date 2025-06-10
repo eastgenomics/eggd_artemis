@@ -45,9 +45,23 @@ def gather_snv_data(snv_paths, dx_project, build) -> dict:
             )
         )
 
+        unique_snv_reports = {r["describe"]["name"] for r in snv_reports}
+        unique_samples = {
+            "-".join(name.split("-")[:2]) for name in unique_snv_reports
+            }
+        no_reports_expected = len(unique_samples)
+
         snv_files = find_snv_files(snv_reports, build)
         merge(snv_data, snv_files)
 
+        no_reports_in_data = len(snv_files.keys())
+        print(snv_files.keys())
+        if no_reports_in_data != no_reports_expected:
+            raise RuntimeError(
+                f"Expected {no_reports_expected} SNV reports, "
+                f"but found {no_reports_in_data} in dict."
+            )
+        print(f"Found {no_reports_in_data} SNV reports in {path}")
     print(f"Size of snv data dict: {len(snv_data.keys())}")
 
     return snv_data
@@ -81,9 +95,23 @@ def gather_cnv_data(cnv_paths, dx_project, url_duration) -> Tuple[dict, str]:
             )
         )
 
+        unique_snv_reports = {r["describe"]["name"] for r in cnv_reports}
+        unique_samples = {
+            "-".join(name.split("-")[:2]) for name in unique_snv_reports
+            }
+        no_reports_expected = len(unique_samples)
+
         gcnv_job_info = get_cnv_call_details(cnv_reports)
         cnv_files = get_cnv_file_ids(cnv_reports, gcnv_job_info)
-
+        print(cnv_files.keys())
+        no_reports_in_data = len(cnv_files.keys())
+        # Check if the number of reports found matches the expected number
+        if no_reports_in_data != no_reports_expected:
+            raise RuntimeError(
+                f"Expected {no_reports_expected} CNV reports, "
+                f"but found {no_reports_in_data} in {path}"
+            )
+        print(f"Found {no_reports_in_data} CNV reports in {path}")
         # Get excluded intervals file
         excluded_intervals = get_excluded_intervals(gcnv_job_info)
         ex_intervals_url = make_url(
