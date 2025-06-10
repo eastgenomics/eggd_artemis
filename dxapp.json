@@ -3,7 +3,7 @@
   "title": "eggd_artemis",
   "summary": "Gathers required files and creates file containing urls for them",
   "dxapi": "1.0.0",
-  "version": "1.6.1",
+  "version": "1.7.0",
   "inputSpec": [
     {
       "name": "snv_path",
