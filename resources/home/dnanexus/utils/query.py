@@ -399,7 +399,7 @@ def find_snv_files(reports, build) -> dict:
             build (int): Genome build used for SNV calling, e.g. 37 or 38.
 
         Returns:
-            data (dict): files found for sample#
+            data (dict): files found for sample
         """
         # Get sample name
         sample = report["describe"]["name"].split("_")[0]
