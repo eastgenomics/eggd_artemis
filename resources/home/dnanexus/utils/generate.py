@@ -22,6 +22,8 @@ def gather_snv_data(snv_paths, dx_project, build) -> dict:
     """
     Finds all xlsx reports and the associated job input files using
     query.find_snv_files from the given SNV path(s)
+    Check if the number of reports found matches the expected number of unique
+    sample names based on the SNV report names.
 
     Args:
         snv_paths (str): comma separated string of SNV path(s) to search
@@ -30,6 +32,9 @@ def gather_snv_data(snv_paths, dx_project, build) -> dict:
 
     Returns:
         snv_data (dict): dict of all sample SNV file data
+    Raises:
+        RuntimeError: if the number of SNV reports found does not match
+            the expected number based on unique sample names.
     """
     snv_data = {}
 
@@ -70,7 +75,10 @@ def gather_snv_data(snv_paths, dx_project, build) -> dict:
 def gather_cnv_data(cnv_paths, dx_project, url_duration) -> Tuple[dict, str]:
     """
     Finds all xlsx reports and the associated job input files from the
-    given CNV path(s)
+    given CNV path(s).
+    Check if the number of reports found matches the expected number of unique
+    sample names based on the CNV report names.
+
 
     Args:
         cnv_paths (str): comma separated string of CNV path(s) to search
@@ -80,6 +88,9 @@ def gather_cnv_data(cnv_paths, dx_project, url_duration) -> Tuple[dict, str]:
     Returns:
         cnv_data (dict): dict of all sample CNV file data
         ex_intervals_url (str): download URL for the excluded intervals file
+    Raises:
+        RuntimeError: if the number of CNV reports found does not match
+            the expected number based on unique sample names.
     """
     cnv_data = {}
 
