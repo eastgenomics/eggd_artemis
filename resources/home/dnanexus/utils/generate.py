@@ -50,24 +50,26 @@ def gather_snv_data(snv_paths, dx_project, build) -> dict:
             )
         )
 
-        unique_snv_reports = {r["describe"]["name"] for r in snv_reports}
-        unique_samples = {
-            "-".join(name.split("-")[:2]) for name in unique_snv_reports
-            }
-        no_reports_expected = len(unique_samples)
+        no_reports_expected = len(snv_reports)
 
         snv_files = find_snv_files(snv_reports, build)
         merge(snv_data, snv_files)
+        # Count total reports across all samples and clinical indications
+        total_reports_processed = 0
+        for sample, sample_data in snv_files.items():
+            for clin_ind in sample_data.get("clinical_indications", {}):
+                snv_reports_list = sample_data["clinical_indications"][clin_ind].get("SNV", [])
+                if snv_reports_list:
+                    total_reports_processed += len(snv_reports_list)
 
-        no_reports_in_data = len(snv_files.keys())
-        print(snv_files.keys())
-        if no_reports_in_data != no_reports_expected:
+        print(f"Found {no_reports_expected} SNV reports")
+
+        if total_reports_processed != no_reports_expected:
             raise RuntimeError(
-                f"Expected {no_reports_expected} SNV reports, "
-                f"but found {no_reports_in_data} in dict."
+                f"Found {no_reports_expected} SNV report files, "
+                f"but processed {total_reports_processed} reports in the data structure."
             )
-        print(f"Found {no_reports_in_data} SNV reports in {path}")
-    print(f"Size of snv data dict: {len(snv_data.keys())}")
+        print(f"Successfully processed {total_reports_processed} SNV reports from {path}")
 
     return snv_data
 
@@ -106,23 +108,27 @@ def gather_cnv_data(cnv_paths, dx_project, url_duration) -> Tuple[dict, str]:
             )
         )
 
-        unique_snv_reports = {r["describe"]["name"] for r in cnv_reports}
-        unique_samples = {
-            "-".join(name.split("-")[:2]) for name in unique_snv_reports
-            }
-        no_reports_expected = len(unique_samples)
+        no_reports_expected = len(cnv_reports)
 
         gcnv_job_info = get_cnv_call_details(cnv_reports)
         cnv_files = get_cnv_file_ids(cnv_reports, gcnv_job_info)
-        print(cnv_files.keys())
-        no_reports_in_data = len(cnv_files.keys())
-        # Check if the number of reports found matches the expected number
-        if no_reports_in_data != no_reports_expected:
+
+        # Count total reports across all samples and clinical indications
+        total_reports_processed = 0
+        for sample, sample_data in cnv_files.items():
+            for clin_ind in sample_data.get("clinical_indications", {}):
+                cnv_reports_list = sample_data["clinical_indications"][clin_ind].get("CNV", [])
+                if cnv_reports_list:
+                    total_reports_processed += len(cnv_reports_list)
+
+        print(f"Found {no_reports_expected} CNV reports")
+
+        if total_reports_processed != no_reports_expected:
             raise RuntimeError(
-                f"Expected {no_reports_expected} CNV reports, "
-                f"but found {no_reports_in_data} in {path}"
+                f"Found {no_reports_expected} CNV report files, "
+                f"but processed {total_reports_processed} reports in the data structure."
             )
-        print(f"Found {no_reports_in_data} CNV reports in {path}")
+        print(f"Successfully processed {total_reports_processed} CNV reports from {path}")
         # Get excluded intervals file
         excluded_intervals = get_excluded_intervals(gcnv_job_info)
         ex_intervals_url = make_url(
@@ -130,8 +136,6 @@ def gather_cnv_data(cnv_paths, dx_project, url_duration) -> Tuple[dict, str]:
         )
 
         merge(cnv_data, cnv_files)
-
-    print(f"Size of cnv data dict: {len(cnv_data.keys())}")
 
     return cnv_data, ex_intervals_url
 
