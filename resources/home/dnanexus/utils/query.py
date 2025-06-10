@@ -283,9 +283,11 @@ def get_cnv_file_ids(reports, gcnv_dict) -> dict:
         }
         return data
 
+    # Create a nested defaultdict to store CNV data
     cnv_data = defaultdict(
         lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     )
+    errors = []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
         # submit jobs mapping each id to describe call
@@ -322,8 +324,25 @@ def get_cnv_file_ids(reports, gcnv_dict) -> dict:
                 print(
                     f"Error getting data for {concurrent_jobs[future]}: {exc}"
                 )
-                # Propagate the exception to the caller so doesn't silently fail.
-                raise exc
+                # Collect the error details for later reporting
+                report = concurrent_jobs[future]
+                error_info = {
+                    "report": report["describe"]["name"] if "describe" in report else "Unknown",
+                    "id": report.get("id", "Unknown"),
+                    "error": str(exc),
+                    "exception_type": type(exc).__name__
+                }
+                errors.append(error_info)
+
+    # After processing all reports, check if any errors occurred
+    if errors:
+        # Print summary of all errors
+        print(f"Encountered {len(errors)} errors during processing:")
+        for i, error in enumerate(errors, 1):
+            print(f"{i}. Report: {error['report']} - Error: {error['error']}")
+
+        # Raise exception with all errors collected
+        raise RuntimeError(f"Failed to process {len(errors)} reports. See logs for details.")
 
     return cnv_data
 
@@ -510,6 +529,7 @@ def find_snv_files(reports, build) -> dict:
     snv_data = defaultdict(
         lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     )
+    errors = []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
         # submit jobs mapping each id to describe call
@@ -541,7 +561,24 @@ def find_snv_files(reports, build) -> dict:
                 print(
                     f"Error getting data for {concurrent_jobs[future]}: {exc}"
                 )
-                # Propagate the exception to the caller so doesn't silently fail.
-                raise exc
+                # Collect the error details for later reporting
+                report = concurrent_jobs[future]
+                error_info = {
+                    "report": report["describe"]["name"] if "describe" in report else "Unknown",
+                    "id": report.get("id", "Unknown"),
+                    "error": str(exc),
+                    "exception_type": type(exc).__name__
+                }
+                errors.append(error_info)
+
+    # After processing all reports, check if any errors occurred
+    if errors:
+        # Print summary of all errors
+        print(f"Encountered {len(errors)} errors during processing:")
+        for i, error in enumerate(errors, 1):
+            print(f"{i}. Report: {error['report']} - Error: {error['error']}")
+
+        # Raise exception with all errors collected
+        raise RuntimeError(f"Failed to process {len(errors)} reports. See logs for details.")
 
     return snv_data
