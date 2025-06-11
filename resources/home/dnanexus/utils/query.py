@@ -347,13 +347,12 @@ def get_cnv_file_ids(reports, gcnv_dict) -> dict:
     return cnv_data
 
 
-def find_snv_files(reports, build) -> dict:
+def find_snv_files(reports) -> dict:
     """
     Gather files related to SNV reports
 
     Args:
         reports (list): List of SNV report dxpy describe dicts
-        build (int): Genome build used for SNV calling, e.g. 37 or 38.
 
     Returns:
         snv_data (dict): Nested dictionary of files with sample name
@@ -390,13 +389,12 @@ def find_snv_files(reports, build) -> dict:
     }
     """
 
-    def _find(report, build):
+    def _find(report):
         """
         Find files for single sample
 
         Args:
             report (dict): dx describe return for single sample
-            build (int): Genome build used for SNV calling, e.g. 37 or 38.
 
         Returns:
             data (dict): files found for sample
@@ -535,7 +533,7 @@ def find_snv_files(reports, build) -> dict:
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
         # submit jobs mapping each id to describe call
         concurrent_jobs = {
-            executor.submit(_find, report, build): report for report in reports
+            executor.submit(_find, report): report for report in reports
         }
 
         for future in concurrent.futures.as_completed(concurrent_jobs):

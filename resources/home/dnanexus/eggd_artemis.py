@@ -50,7 +50,7 @@ def main(
     # Gather required SNV files if SNV path is provided
     if snv_path:
         logger.info("Gathering Small variant files")
-        snv_data = gather_snv_data(snv_paths=snv_path, dx_project=project_id, build=build)
+        snv_data = gather_snv_data(snv_paths=snv_path, dx_project=project_id)
 
         # If multiqc report not given, search for multiqc report
         if not multiqc_report:
