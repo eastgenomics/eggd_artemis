@@ -44,12 +44,6 @@ def main(
 
     project_name, project_id, job_output_folder = initialise_project()
 
-    # Check if the build is valid
-    if build not in [37, 38]:
-        err = f"Invalid build: {build}. Must be 37 or 38."
-        logger.error(err)
-        raise ValueError(err)
-
     snv_data = {}
     cnv_data = {}
 

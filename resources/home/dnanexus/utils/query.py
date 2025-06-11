@@ -452,31 +452,13 @@ def find_snv_files(reports, build) -> dict:
         # Logic for extracting bam and bai files
         mappings_bam = mappings_bai = None
         parent_vcf_job_details = {}
-        # Extract the additional regions calling job id from the vcf metadata
-        if build == 38:
-            # For genome build 38, the additional calling job is stored in the
-            # vcf file metadata
-            additional_calling_job_id = dxpy.describe(vcf_file)["createdBy"][
-                "job"
-            ]
-            if not additional_calling_job_id:
-                print(
-                    "No additional calling job id found in vcf file metadata. "
-                    "Assuming the vcf was created by a sentieon job."
-                )
-            else:
-                parent_vcf_job_details = dxpy.bindings.dxjob.DXJob(
-                    dxid=additional_calling_job_id
-                ).describe()
-        else:
-            # If the vcf file was created by a sentieon job, we can find the
-            # sentieon job id from the vcf file metadata
-            sentieon_job_id = dxpy.describe(vcf_file).get(
-                "createdBy", {}
-            ).get("job", None)
-            parent_vcf_job_details = dxpy.bindings.dxjob.DXJob(
-                    dxid=sentieon_job_id
-            ).describe()
+        # Extract the additional regions calling/sentieon job id from the vcf metadata
+        vcf_creation_job_id = dxpy.describe(vcf_file)["createdBy"][
+            "job"
+        ]
+        parent_vcf_job_details = dxpy.bindings.dxjob.DXJob(
+            dxid=vcf_creation_job_id
+        ).describe()
 
         parent_dias_single_analysis = (
             parent_vcf_job_details.get("parentAnalysis", None)
@@ -501,6 +483,9 @@ def find_snv_files(reports, build) -> dict:
         else:
             # If no parent analysis found
             print("No parent analysis found for dias single workflow.")
+            raise RuntimeError(
+                "No parent analysis found for dias single workflow."
+            )
 
         # Store in dictionary to return
         data = {
