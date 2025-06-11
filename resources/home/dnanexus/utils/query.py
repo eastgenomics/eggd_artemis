@@ -488,13 +488,21 @@ def find_snv_files(reports, build) -> dict:
             )
 
         # Check all required fields are present
-        if not all(
-            [sample, mappings_bam, mappings_bai, clinical_indication,
-             coverage_report, summary_text, snv_variant_count]
-        ):
+        if not all([
+            sample,
+            mappings_bam,
+            mappings_bai,
+            clinical_indication,
+            coverage_report,
+            summary_text
+        ]) or snv_variant_count is None:
             raise ValueError(
                 "Missing required fields in SNV report: "
                 f"{report['describe']['name']}"
+                "List of fields: "
+                f"{sample}, {mappings_bam}, {mappings_bai}, "
+                  f"{clinical_indication}, {coverage_report}, "
+                  f"{summary_text}, {snv_variant_count}"
             )
 
         # Store in dictionary to return
