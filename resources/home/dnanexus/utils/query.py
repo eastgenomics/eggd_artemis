@@ -487,6 +487,16 @@ def find_snv_files(reports, build) -> dict:
                 "No parent analysis found for dias single workflow."
             )
 
+        # Check all required fields are present
+        if not all(
+            [sample, mappings_bam, mappings_bai, clinical_indication,
+             coverage_report, summary_text, snv_variant_count]
+        ):
+            raise ValueError(
+                "Missing required fields in SNV report: "
+                f"{report['describe']['name']}"
+            )
+
         # Store in dictionary to return
         data = {
             "sample": sample,
