@@ -283,9 +283,11 @@ def get_cnv_file_ids(reports, gcnv_dict) -> dict:
         }
         return data
 
+    # Create a nested defaultdict to store CNV data
     cnv_data = defaultdict(
         lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     )
+    errors = []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
         # submit jobs mapping each id to describe call
@@ -322,6 +324,25 @@ def get_cnv_file_ids(reports, gcnv_dict) -> dict:
                 print(
                     f"Error getting data for {concurrent_jobs[future]}: {exc}"
                 )
+                # Collect the error details for later reporting
+                report = concurrent_jobs[future]
+                error_info = {
+                    "report": report["describe"]["name"] if "describe" in report else "Unknown",
+                    "id": report.get("id", "Unknown"),
+                    "error": str(exc),
+                    "exception_type": type(exc).__name__
+                }
+                errors.append(error_info)
+
+    # After processing all reports, check if any errors occurred
+    if errors:
+        # Print summary of all errors
+        print(f"Encountered {len(errors)} errors during processing:")
+        for i, error in enumerate(errors, 1):
+            print(f"{i}. Report: {error['report']} - Error: {error['error']}")
+
+        # Raise exception with all errors collected
+        raise RuntimeError(f"Failed to process {len(errors)} reports. See logs for details.")
 
     return cnv_data
 
@@ -393,49 +414,101 @@ def find_snv_files(reports) -> dict:
         job_id = report["describe"]["createdBy"]["job"]
 
         # Get the workflow id that included the job
-        parent_analysis = dxpy.bindings.dxjob.DXJob(dxid=job_id).describe()[
+        report_parent_analysis = dxpy.bindings.dxjob.DXJob(dxid=job_id).describe()[
             "parentAnalysis"
         ]
 
         # Get the vcf file id and athena coverage file id
-        parent_details = dxpy.bindings.dxanalysis.DXAnalysis(
-            dxid=parent_analysis
+        report_parent_details = dxpy.bindings.dxanalysis.DXAnalysis(
+            dxid=report_parent_analysis
         ).describe()
         try:
-            vcf_file = parent_details["input"]["stage-rpt_vep.vcf"]
+            vcf_file = report_parent_details["input"]["stage-rpt_vep.vcf"]
         except KeyError:
-            vcf_file = parent_details["input"][
+            vcf_file = report_parent_details["input"][
                 "stage-G9Q0jzQ4vyJ3x37X4KBKXZ5v.vcf"
             ]
         try:
-            coverage_report = parent_details["output"][
+            coverage_report = report_parent_details["output"][
                 "stage-rpt_athena.report"
             ]
         except KeyError:
-            coverage_report = parent_details["output"][
+            coverage_report = report_parent_details["output"][
                 "stage-Fyq5z18433GfYZbp3vX1KqjB.report"
             ]
 
         summary_text = (
-            parent_details.get("output", {})
+            report_parent_details.get("output", {})
             .get("stage-rpt_athena.summary_text", {})
             .get("$dnanexus_link")
         )
         if not summary_text:
             print(
                 "No summary .txt file found in output of eggd_athena stage"
-                f" for SNV reports workflow ({parent_analysis})"
+                f" for SNV reports workflow ({report_parent_analysis})"
+            )
+        # Logic for extracting bam and bai files
+        mappings_bam = mappings_bai = None
+        parent_vcf_job_details = {}
+        # Extract the additional regions calling/sentieon job id from the vcf metadata
+        vcf_creation_job_id = dxpy.describe(vcf_file)["createdBy"][
+            "job"
+        ]
+        parent_vcf_job_details = dxpy.bindings.dxjob.DXJob(
+            dxid=vcf_creation_job_id
+        ).describe()
+        # Get the parent analysis id of the vcf job
+        parent_dias_single_analysis_id = (
+            parent_vcf_job_details.get("parentAnalysis", None)
+            )
+        if not parent_dias_single_analysis_id:
+            raise RuntimeError(
+                "No parent analysis found for dias-single workflow. "
+                f"Sample: {sample}, VCF job id: {vcf_creation_job_id}"
+                )
+
+        # Get the parent analysis details
+        dias_single_analysis_details = dxpy.bindings.dxanalysis.DXAnalysis(
+                dxid=parent_dias_single_analysis_id
+            ).describe()
+
+        if dias_single_analysis_details:
+            # Get bam & bai job id from sention job metadata
+            try:
+                mappings_bam_stage = dias_single_analysis_details["output"]["stage-sentieon_dnaseq.mappings_bam"]
+                mappings_bam = mappings_bam_stage.get("$dnanexus_link", None)
+                mappings_bai_stage = dias_single_analysis_details["output"]["stage-sentieon_dnaseq.mappings_bam_bai"]
+                mappings_bai = mappings_bai_stage.get("$dnanexus_link", None)
+            except KeyError as err:
+                print(
+                    "No mappings bam or bai found in output of sentieon_dnaseq stage"
+                    f" for dias single workflow ({parent_dias_single_analysis_id})"
+                )
+                raise err
+        else:
+            # If no parent analysis found
+            print("No parent analysis found for dias single workflow.")
+            raise RuntimeError(
+                "No parent analysis found for dias single workflow."
             )
 
-        # Extract the sention job id from the vcf metadata
-        sention_job_id = dxpy.describe(vcf_file)["createdBy"]["job"]
-        sentieon_details = dxpy.bindings.dxjob.DXJob(
-            dxid=sention_job_id
-        ).describe()
-
-        # Get bam & bai job id from sention job metadata
-        mappings_bam = sentieon_details["output"]["mappings_bam"]
-        mappings_bai = sentieon_details["output"]["mappings_bam_bai"]
+        # Check all required fields are present
+        if not all([
+            sample,
+            mappings_bam,
+            mappings_bai,
+            clinical_indication,
+            coverage_report,
+            summary_text
+        ]) or snv_variant_count is None:
+            raise ValueError(
+                "Missing required fields in SNV report: "
+                f"{report['describe']['name']}"
+                "List of fields: "
+                f"{sample}, {mappings_bam}, {mappings_bai}, "
+                  f"{clinical_indication}, {coverage_report}, "
+                  f"{summary_text}, {snv_variant_count}"
+            )
 
         # Store in dictionary to return
         data = {
@@ -458,9 +531,11 @@ def find_snv_files(reports) -> dict:
 
         return data
 
+    # Create a nested defaultdict to store SNV data
     snv_data = defaultdict(
         lambda: defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
     )
+    errors = []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
         # submit jobs mapping each id to describe call
@@ -492,5 +567,24 @@ def find_snv_files(reports) -> dict:
                 print(
                     f"Error getting data for {concurrent_jobs[future]}: {exc}"
                 )
+                # Collect the error details for later reporting
+                report = concurrent_jobs[future]
+                error_info = {
+                    "report": report["describe"]["name"] if "describe" in report else "Unknown",
+                    "id": report.get("id", "Unknown"),
+                    "error": str(exc),
+                    "exception_type": type(exc).__name__
+                }
+                errors.append(error_info)
+
+    # After processing all reports, check if any errors occurred
+    if errors:
+        # Print summary of all errors
+        print(f"Encountered {len(errors)} errors during processing:")
+        for i, error in enumerate(errors, 1):
+            print(f"{i}. Report: {error['report']} - Error: {error['error']}")
+
+        # Raise exception with all errors collected
+        raise RuntimeError(f"Failed to process {len(errors)} reports. See logs for details.")
 
     return snv_data

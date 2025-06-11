@@ -22,6 +22,8 @@ def gather_snv_data(snv_paths, dx_project) -> dict:
     """
     Finds all xlsx reports and the associated job input files using
     query.find_snv_files from the given SNV path(s)
+    Verify that the number of processed SNV reports matches the number of
+    `.xlsx` report files discovered in the path.
 
     Args:
         snv_paths (str): comma separated string of SNV path(s) to search
@@ -29,6 +31,9 @@ def gather_snv_data(snv_paths, dx_project) -> dict:
 
     Returns:
         snv_data (dict): dict of all sample SNV file data
+    Raises:
+        RuntimeError: if the number of SNV reports found does not match
+            the expected number based on unique sample names.
     """
     snv_data = {}
 
@@ -44,10 +49,26 @@ def gather_snv_data(snv_paths, dx_project) -> dict:
             )
         )
 
+        no_reports_expected = len(snv_reports)
+
         snv_files = find_snv_files(snv_reports)
         merge(snv_data, snv_files)
+        # Count total reports across all samples and clinical indications
+        total_reports_processed = 0
+        for sample, sample_data in snv_files.items():
+            for clin_ind in sample_data.get("clinical_indications", {}):
+                snv_reports_list = sample_data["clinical_indications"][clin_ind].get("SNV", [])
+                if snv_reports_list:
+                    total_reports_processed += len(snv_reports_list)
 
-    print(f"Size of snv data dict: {len(snv_data.keys())}")
+        print(f"Found {no_reports_expected} SNV reports")
+
+        if total_reports_processed != no_reports_expected:
+            raise RuntimeError(
+                f"Found {no_reports_expected} SNV report files, "
+                f"but processed {total_reports_processed} reports in the data structure."
+            )
+        print(f"Successfully processed {total_reports_processed} SNV reports from {path}")
 
     return snv_data
 
@@ -55,7 +76,10 @@ def gather_snv_data(snv_paths, dx_project) -> dict:
 def gather_cnv_data(cnv_paths, dx_project, url_duration) -> Tuple[dict, str]:
     """
     Finds all xlsx reports and the associated job input files from the
-    given CNV path(s)
+    given CNV path(s).
+    Check if the number of reports found matches the expected number of unique
+    sample names based on the CNV report names.
+
 
     Args:
         cnv_paths (str): comma separated string of CNV path(s) to search
@@ -65,6 +89,9 @@ def gather_cnv_data(cnv_paths, dx_project, url_duration) -> Tuple[dict, str]:
     Returns:
         cnv_data (dict): dict of all sample CNV file data
         ex_intervals_url (str): download URL for the excluded intervals file
+    Raises:
+        RuntimeError: if the number of CNV reports found does not match
+            the expected number based on unique sample names.
     """
     cnv_data = {}
 
@@ -80,9 +107,27 @@ def gather_cnv_data(cnv_paths, dx_project, url_duration) -> Tuple[dict, str]:
             )
         )
 
+        no_reports_expected = len(cnv_reports)
+
         gcnv_job_info = get_cnv_call_details(cnv_reports)
         cnv_files = get_cnv_file_ids(cnv_reports, gcnv_job_info)
 
+        # Count total reports across all samples and clinical indications
+        total_reports_processed = 0
+        for sample, sample_data in cnv_files.items():
+            for clin_ind in sample_data.get("clinical_indications", {}):
+                cnv_reports_list = sample_data["clinical_indications"][clin_ind].get("CNV", [])
+                if cnv_reports_list:
+                    total_reports_processed += len(cnv_reports_list)
+
+        print(f"Found {no_reports_expected} CNV reports")
+
+        if total_reports_processed != no_reports_expected:
+            raise RuntimeError(
+                f"Found {no_reports_expected} CNV report files, "
+                f"but processed {total_reports_processed} reports in the data structure."
+            )
+        print(f"Successfully processed {total_reports_processed} CNV reports from {path}")
         # Get excluded intervals file
         excluded_intervals = get_excluded_intervals(gcnv_job_info)
         ex_intervals_url = make_url(
@@ -90,8 +135,6 @@ def gather_cnv_data(cnv_paths, dx_project, url_duration) -> Tuple[dict, str]:
         )
 
         merge(cnv_data, cnv_files)
-
-    print(f"Size of cnv data dict: {len(cnv_data.keys())}")
 
     return cnv_data, ex_intervals_url
 
