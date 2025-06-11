@@ -461,7 +461,7 @@ def find_snv_files(reports) -> dict:
         parent_dias_single_analysis_id = (
             parent_vcf_job_details.get("parentAnalysis", None)
             )
-        if not parent_dias_single_analysis:
+        if not parent_dias_single_analysis_id:
             raise RuntimeError("No parent analysis found for dias-single workflow.")
 
         # Get the parent analysis details
@@ -479,7 +479,7 @@ def find_snv_files(reports) -> dict:
             except KeyError as err:
                 print(
                     "No mappings bam or bai found in output of sentieon_dnaseq stage"
-                    f" for dias single workflow ({parent_dias_single_analysis})"
+                    f" for dias single workflow ({parent_dias_single_analysis_id})"
                 )
                 raise err
         else:
