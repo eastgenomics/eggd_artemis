@@ -22,8 +22,8 @@ def gather_snv_data(snv_paths, dx_project) -> dict:
     """
     Finds all xlsx reports and the associated job input files using
     query.find_snv_files from the given SNV path(s)
-    Check if the number of reports found matches the expected number of unique
-    sample names based on the SNV report names.
+    Verify that the number of processed SNV reports matches the number of
+    `.xlsx` report files discovered in the path.
 
     Args:
         snv_paths (str): comma separated string of SNV path(s) to search
