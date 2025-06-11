@@ -457,12 +457,16 @@ def find_snv_files(reports) -> dict:
         parent_vcf_job_details = dxpy.bindings.dxjob.DXJob(
             dxid=vcf_creation_job_id
         ).describe()
-
-        parent_dias_single_analysis = (
+        # Get the parent analysis id of the vcf job
+        parent_dias_single_analysis_id = (
             parent_vcf_job_details.get("parentAnalysis", None)
             )
+        if not parent_dias_single_analysis:
+            raise RuntimeError("No parent analysis found for dias-single workflow.")
+
+        # Get the parent analysis details
         dias_single_analysis_details = dxpy.bindings.dxanalysis.DXAnalysis(
-                dxid=parent_dias_single_analysis
+                dxid=parent_dias_single_analysis_id
             ).describe()
 
         if dias_single_analysis_details:
