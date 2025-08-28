@@ -457,6 +457,9 @@ def find_snv_files(reports) -> dict:
         elif parent_vcf_job_details["executableName"] == "eggd_sentieon":
             mappings_bam = parent_vcf_job_details["output"]["mappings_bam"]["$dnanexus_link"]
             mappings_bai = parent_vcf_job_details["output"]["mappings_bai"]["$dnanexus_link"]
+        else:
+            mappings_bam = None
+            mappings_bai = None
 
         # Check all required fields are present
         if not all([
