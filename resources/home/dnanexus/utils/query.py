@@ -449,9 +449,6 @@ def find_snv_files(reports) -> dict:
             )
 
         # Logic for extracting bam and bai files
-        job_id = dxpy.DXFile(vcf_file).describe()["createdBy"]["job"]
-        analysis_id = dxpy.bindings.dxjob.DXJob(job_id).describe()["parentAnalysis"]
-        report_parent_details = dxpy.bindings.dxanalysis.DXAnalysis(analysis_id).describe()
         vcf_creation_job_id = dxpy.describe(vcf_file)["createdBy"]["job"]
         parent_vcf_job_details = dxpy.bindings.dxjob.DXJob(vcf_creation_job_id).describe()
         if parent_vcf_job_details["executableName"] == "eggd_additional_regions_calling":
