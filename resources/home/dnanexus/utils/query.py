@@ -491,7 +491,7 @@ def find_snv_files(reports) -> dict:
                 print("No BAM/BAI found in input to {}".format(parent_vcf_job_details["id"]))
                 mappings_bam = None
                 mappings_bai = None
-        elif executable_name == "sentieon_dnaseq":
+        elif executable_name == "sentieon-dnaseq":
             try:
                 mappings_bam = parent_vcf_job_details["output"]["mappings_bam"]["$dnanexus_link"]
                 mappings_bai = parent_vcf_job_details["output"]["mappings_bam_bai"]["$dnanexus_link"]
