@@ -1,10 +1,16 @@
 """dxpy querying functions"""
 
-from collections import defaultdict
 import concurrent
-from typing import Union
 
-import dxpy
+from collections import defaultdict
+from typing import Union
+from dxpy import describe
+from dxpy.bindings.dxjob import DXJob
+from dxpy.bindings.dxfile import DXFile
+from dxpy.bindings.dxanalysis import DXAnalysis
+from dxpy.bindings.search import find_jobs
+
+from dxpy.exceptions import ResourceNotFound
 
 
 def get_multiqc_report(path_to_reports, project) -> Union[str, None]:
@@ -22,7 +28,7 @@ def get_multiqc_report(path_to_reports, project) -> Union[str, None]:
 
     # Find MultiQC jobs in the project
     multiqc_reports = list(
-        dxpy.bindings.search.find_jobs(
+        find_jobs(
             name_mode="glob",
             name="*MultiQC*",
             state="done",
@@ -54,7 +60,7 @@ def make_url(file_id, project, url_duration) -> str:
         file_url (string): Download url of requested file
     """
     # Bind dxpy file object to pass to make_download_url command
-    file_info = dxpy.bindings.dxfile.DXFile(dxid=file_id, project=project)
+    file_info = DXFile(dxid=file_id, project=project)
 
     # Extract the file name to allow it to be used in the url
     file_name = file_info.describe()["name"]
@@ -96,28 +102,28 @@ def get_cnv_call_details(reports) -> dict:
     gen_xlsx_job = reports[0]["describe"]["createdBy"]["job"]
 
     # Find the reports workflow analysis id
-    reports_analysis = dxpy.bindings.dxjob.DXJob(dxid=gen_xlsx_job).describe()[
+    reports_analysis = DXJob(dxid=gen_xlsx_job).describe()[
         "parentAnalysis"
     ]
 
     # Find the input vcf id
     try:
-        vcf_id = dxpy.bindings.dxanalysis.DXAnalysis(
+        vcf_id = DXAnalysis(
             dxid=reports_analysis
         ).describe()["input"]["stage-cnv_vep.vcf"]
     except KeyError:
-        vcf_id = dxpy.bindings.dxanalysis.DXAnalysis(
+        vcf_id = DXAnalysis(
             dxid=reports_analysis
         ).describe()["input"]["stage-GFYvJF04qq8VKgq34j30pZZ3.vcf"]
 
     # Find the cnv call job id
-    cnv_call_job = dxpy.describe(vcf_id)["createdBy"]["job"]
+    cnv_call_job = describe(vcf_id)["createdBy"]["job"]
 
     # Store all file ids and names in a dictionary
     calling_files = {}
 
     # Find the output files of the cnv call job
-    cnv_details = dxpy.bindings.dxjob.DXJob(dxid=cnv_call_job).describe()
+    cnv_details = DXJob(dxid=cnv_call_job).describe()
     gcnv_output = cnv_details["output"]["result_files"]
     gcnv_input = cnv_details["input"]["bambais"]
 
@@ -126,7 +132,7 @@ def get_cnv_call_details(reports) -> dict:
         # submit jobs mapping each id to describe call
         concurrent_jobs = {
             executor.submit(
-                dxpy.describe, file, fields={"name": True, "id": True}
+                describe, file, fields={"name": True, "id": True}
             ): file
             for file in gcnv_input + gcnv_output
         }
@@ -213,21 +219,21 @@ def get_cnv_file_ids(reports, gcnv_dict) -> dict:
         # Get file 'details' of the CNV xlsx report so that we can query
         # the clinical indication and variant count. If file has no 'details'
         # set default return to "Unknown"
-        file_details = dxpy.DXFile(report["id"]).get_details()
+        file_details = DXFile(report["id"]).get_details()
         clin_ind = file_details.get("clinical_indication", "Unknown")
         cnv_variant_count = file_details.get("variants", "Unknown")
 
         gen_xlsx_job = report["describe"]["createdBy"]["job"]
 
-        excluded_regions_id = dxpy.bindings.dxjob.DXJob(
+        excluded_regions_id = DXJob(
             dxid=gen_xlsx_job
         ).describe()["input"]["additional_files"][0]["$dnanexus_link"]
 
         # Find the reports workflow analysis id
-        reports_analysis = dxpy.bindings.dxjob.DXJob(
+        reports_analysis = DXJob(
             dxid=gen_xlsx_job
         ).describe()["parentAnalysis"]
-        reports_details = dxpy.bindings.dxanalysis.DXAnalysis(
+        reports_details = DXAnalysis(
             dxid=reports_analysis
         ).describe()
 
@@ -352,7 +358,7 @@ def find_snv_files(reports) -> dict:
     Gather files related to SNV reports
 
     Args:
-        reports (list): List of SNV report dxpy describe dicts
+        reports (list): List of SNV report dicts from dxpy.describe
 
     Returns:
         snv_data (dict): Nested dictionary of files with sample name
@@ -404,7 +410,7 @@ def find_snv_files(reports) -> dict:
         # Get file 'details' of the SNV xlsx report so that we can query
         # the clinical indication and variant count. If file has no 'details'
         # set default return to "Unknown"
-        file_details = dxpy.DXFile(report["id"]).get_details()
+        file_details = DXFile(report["id"]).get_details()
         clinical_indication = file_details.get(
             "clinical_indication", "Unknown"
         )
@@ -414,7 +420,7 @@ def find_snv_files(reports) -> dict:
         job_id = report["describe"]["createdBy"]["job"]
 
         # Get the workflow id that included the job
-        report_parent_analysis = dxpy.bindings.dxjob.DXJob(dxid=job_id).describe()[
+        report_parent_analysis = DXJob(dxid=job_id).describe()[
             "parentAnalysis"
         ]
 
