@@ -127,6 +127,8 @@ def get_cnv_call_details(reports) -> dict:
     gcnv_output = cnv_details["output"]["result_files"]
     gcnv_input = cnv_details["input"]["bambais"]
 
+    errors = []
+
     # get and store name and file ID of all input and output files
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
         # submit jobs mapping each id to describe call
@@ -142,11 +144,31 @@ def get_cnv_call_details(reports) -> dict:
             try:
                 data = future.result()
                 calling_files[data["name"]] = data["id"]
+
             except Exception as exc:
                 # catch any errors that might get raised during querying
                 print(
                     f"Error getting data for {concurrent_jobs[future]}: {exc}"
                 )
+                # Collect the error details for later reporting
+                report = concurrent_jobs[future]
+                error_info = {
+                    "report": report["describe"]["name"] if "describe" in report else "Unknown",
+                    "id": report.get("id", "Unknown"),
+                    "error": str(exc),
+                    "exception_type": type(exc).__name__
+                }
+                errors.append(error_info)
+
+    # After processing all reports, check if any errors occurred
+    if errors:
+        # Print summary of all errors
+        print(f"Encountered {len(errors)} errors during processing:")
+        for i, error in enumerate(errors, 1):
+            print(f"{i}. Report: {error['report']} - Error: {error['error']}")
+
+        # Raise exception with all errors collected
+        raise RuntimeError(f"Failed to process {len(errors)} reports. See logs for details.")
 
     print(f"Found {len(calling_files.keys())} gCNV input / output files")
 
