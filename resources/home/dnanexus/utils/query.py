@@ -449,7 +449,7 @@ def find_snv_files(reports) -> dict:
             )
 
         # Logic for extracting bam and bai files
-        job_id = dxpy.DXFile(job_id).describe()["createdBy"]["job"]
+        job_id = dxpy.DXFile(vcf_file).describe()["createdBy"]["job"]
         analysis_id = dxpy.bindings.dxjob.DXJob(job_id).describe()["parentAnalysis"]
         report_parent_details = dxpy.bindings.dxanalysis.DXAnalysis(analysis_id).describe()
         vcf_file = report_parent_details["input"]["stage-rpt_vep.vcf"]
