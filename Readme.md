@@ -7,7 +7,7 @@
 Gathers required files and creates file containing urls to allow file download within CUH & the LGLs.
 
 ## What inputs are required for this app to run?
-* `snv_path`[optional]: List of absolute paths to folder containing the variant reports for small variants
+* `snv_path`[optional]: List of absolute paths to folder containing the variant reports for small variants. _(Warning: all reports submitted must be outputs produced as part of a workflow run, not as a standalone app execution)_
 * `cnv_path`[optional]: List of absolute paths to folder containing the variant reports for CNVs. _(Warning: all reports submitted to this argument must be derived from a single CNV calling job)_
 * `url_duration`[optional]: Time (in seconds) until the generated links expire. (Default = 4838400)
 * `bed_file`[optional]: Static capture bed file
