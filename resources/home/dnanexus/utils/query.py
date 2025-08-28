@@ -480,17 +480,27 @@ def find_snv_files(reports) -> dict:
             )
 
         # Logic for extracting bam and bai files
-        vcf_creation_job_id = dxpy.describe(vcf_file)["createdBy"]["job"]
-        parent_vcf_job_details = dxpy.bindings.dxjob.DXJob(vcf_creation_job_id).describe()
-        if parent_vcf_job_details["executableName"] == "eggd_additional_regions_calling":
-            mappings_bam = parent_vcf_job_details["input"]["input_bam"]["$dnanexus_link"]
-            mappings_bai = parent_vcf_job_details["input"]["input_bai"]["$dnanexus_link"]
-        elif parent_vcf_job_details["executableName"] == "eggd_sentieon":
-            mappings_bam = parent_vcf_job_details["output"]["mappings_bam"]["$dnanexus_link"]
-            mappings_bai = parent_vcf_job_details["output"]["mappings_bai"]["$dnanexus_link"]
+        vcf_creation_job_id = describe(vcf_file)["createdBy"]["job"]
+        parent_vcf_job_details = DXJob(vcf_creation_job_id).describe()
+        executable_name = parent_vcf_job_details["executableName"]
+        if executable_name == "eggd_additional_regions_calling":
+            try:
+                mappings_bam = parent_vcf_job_details["input"]["input_bam"]["$dnanexus_link"]
+                mappings_bai = parent_vcf_job_details["input"]["input_bai"]["$dnanexus_link"]
+            except KeyError:
+                print("No BAM/BAI found in input to {}".format(parent_vcf_job_details["id"]))
+                mappings_bam = None
+                mappings_bai = None
+        elif executable_name == "sentieon_dnaseq":
+            try:
+                mappings_bam = parent_vcf_job_details["output"]["mappings_bam"]["$dnanexus_link"]
+                mappings_bai = parent_vcf_job_details["output"]["mappings_bam_bai"]["$dnanexus_link"]
+            except KeyError:
+                print("No BAM/BAI found in output from {}".format(parent_vcf_job_details["id"]))
+                mappings_bam = None
+                mappings_bai = None
         else:
-            mappings_bam = None
-            mappings_bai = None
+            raise ValueError(f"The eggd_vep VCF input is an output from unsupported app {executable_name}. Exiting...")
 
         # Check all required fields are present
         if not all([
