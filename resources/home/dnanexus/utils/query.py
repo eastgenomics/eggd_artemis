@@ -447,9 +447,12 @@ def find_snv_files(reports) -> dict:
         ]
 
         # Get the vcf file id and athena coverage file id
-        report_parent_details = dxpy.bindings.dxanalysis.DXAnalysis(
-            dxid=report_parent_analysis
-        ).describe()
+        try:
+            report_parent_details = DXAnalysis(
+                    dxid=report_parent_analysis).describe()
+        except ResourceNotFound as e:
+            print(f"No parent analysis found for {job_id}")
+            raise(e)
         try:
             vcf_file = report_parent_details["input"]["stage-rpt_vep.vcf"]
         except KeyError:
