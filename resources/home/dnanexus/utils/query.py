@@ -447,50 +447,20 @@ def find_snv_files(reports) -> dict:
                 "No summary .txt file found in output of eggd_athena stage"
                 f" for SNV reports workflow ({report_parent_analysis})"
             )
+
         # Logic for extracting bam and bai files
-        mappings_bam = mappings_bai = None
-        parent_vcf_job_details = {}
-        # Extract the additional regions calling/sentieon job id from the vcf metadata
-        vcf_creation_job_id = dxpy.describe(vcf_file)["createdBy"][
-            "job"
-        ]
-        parent_vcf_job_details = dxpy.bindings.dxjob.DXJob(
-            dxid=vcf_creation_job_id
-        ).describe()
-        # Get the parent analysis id of the vcf job
-        parent_dias_single_analysis_id = (
-            parent_vcf_job_details.get("parentAnalysis", None)
-            )
-        if not parent_dias_single_analysis_id:
-            raise RuntimeError(
-                "No parent analysis found for dias-single workflow. "
-                f"Sample: {sample}, VCF job id: {vcf_creation_job_id}"
-                )
-
-        # Get the parent analysis details
-        dias_single_analysis_details = dxpy.bindings.dxanalysis.DXAnalysis(
-                dxid=parent_dias_single_analysis_id
-            ).describe()
-
-        if dias_single_analysis_details:
-            # Get bam & bai job id from sention job metadata
-            try:
-                mappings_bam_stage = dias_single_analysis_details["output"]["stage-sentieon_dnaseq.mappings_bam"]
-                mappings_bam = mappings_bam_stage.get("$dnanexus_link", None)
-                mappings_bai_stage = dias_single_analysis_details["output"]["stage-sentieon_dnaseq.mappings_bam_bai"]
-                mappings_bai = mappings_bai_stage.get("$dnanexus_link", None)
-            except KeyError as err:
-                print(
-                    "No mappings bam or bai found in output of sentieon_dnaseq stage"
-                    f" for dias single workflow ({parent_dias_single_analysis_id})"
-                )
-                raise err
-        else:
-            # If no parent analysis found
-            print("No parent analysis found for dias single workflow.")
-            raise RuntimeError(
-                "No parent analysis found for dias single workflow."
-            )
+        job_id = dxpy.DXFile(job_id).describe()["createdBy"]["job"]
+        analysis_id = dxpy.bindings.dxjob.DXJob(job_id).describe()["parentAnalysis"]
+        report_parent_details = dxpy.bindings.dxanalysis.DXAnalysis(analysis_id).describe()
+        vcf_file = report_parent_details["input"]["stage-rpt_vep.vcf"]
+        vcf_creation_job_id = dxpy.describe(vcf_file)["createdBy"]["job"]
+        parent_vcf_job_details = dxpy.bindings.dxjob.DXJob(vcf_creation_job_id).describe()
+        if parent_vcf_job_details["executableName"] == "eggd_additional_regions_calling":
+            mappings_bam = parent_vcf_job_details["input"]["input_bam"]["$dnanexus_link"]
+            mappings_bai = parent_vcf_job_details["input"]["input_bai"]["$dnanexus_link"]
+        elif parent_vcf_job_details["executableName"] == "eggd_sentieon":
+            mappings_bam = parent_vcf_job_details["output"]["mappings_bam"]["$dnanexus_link"]
+            mappings_bai = parent_vcf_job_details["output"]["mappings_bai"]["$dnanexus_link"]
 
         # Check all required fields are present
         if not all([
