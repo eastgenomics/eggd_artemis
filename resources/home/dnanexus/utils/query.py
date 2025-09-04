@@ -1,10 +1,16 @@
 """dxpy querying functions"""
 
-from collections import defaultdict
 import concurrent
-from typing import Union
 
-import dxpy
+from collections import defaultdict
+from typing import Union
+from dxpy import describe
+from dxpy.bindings.dxjob import DXJob
+from dxpy.bindings.dxfile import DXFile
+from dxpy.bindings.dxanalysis import DXAnalysis
+from dxpy.bindings.search import find_jobs
+
+from dxpy.exceptions import ResourceNotFound
 
 
 def get_multiqc_report(path_to_reports, project) -> Union[str, None]:
@@ -22,7 +28,7 @@ def get_multiqc_report(path_to_reports, project) -> Union[str, None]:
 
     # Find MultiQC jobs in the project
     multiqc_reports = list(
-        dxpy.bindings.search.find_jobs(
+        find_jobs(
             name_mode="glob",
             name="*MultiQC*",
             state="done",
@@ -54,7 +60,7 @@ def make_url(file_id, project, url_duration) -> str:
         file_url (string): Download url of requested file
     """
     # Bind dxpy file object to pass to make_download_url command
-    file_info = dxpy.bindings.dxfile.DXFile(dxid=file_id, project=project)
+    file_info = DXFile(dxid=file_id, project=project)
 
     # Extract the file name to allow it to be used in the url
     file_name = file_info.describe()["name"]
@@ -96,37 +102,39 @@ def get_cnv_call_details(reports) -> dict:
     gen_xlsx_job = reports[0]["describe"]["createdBy"]["job"]
 
     # Find the reports workflow analysis id
-    reports_analysis = dxpy.bindings.dxjob.DXJob(dxid=gen_xlsx_job).describe()[
+    reports_analysis = DXJob(dxid=gen_xlsx_job).describe()[
         "parentAnalysis"
     ]
 
     # Find the input vcf id
     try:
-        vcf_id = dxpy.bindings.dxanalysis.DXAnalysis(
+        vcf_id = DXAnalysis(
             dxid=reports_analysis
         ).describe()["input"]["stage-cnv_vep.vcf"]
     except KeyError:
-        vcf_id = dxpy.bindings.dxanalysis.DXAnalysis(
+        vcf_id = DXAnalysis(
             dxid=reports_analysis
         ).describe()["input"]["stage-GFYvJF04qq8VKgq34j30pZZ3.vcf"]
 
     # Find the cnv call job id
-    cnv_call_job = dxpy.describe(vcf_id)["createdBy"]["job"]
+    cnv_call_job = describe(vcf_id)["createdBy"]["job"]
 
     # Store all file ids and names in a dictionary
     calling_files = {}
 
     # Find the output files of the cnv call job
-    cnv_details = dxpy.bindings.dxjob.DXJob(dxid=cnv_call_job).describe()
+    cnv_details = DXJob(dxid=cnv_call_job).describe()
     gcnv_output = cnv_details["output"]["result_files"]
     gcnv_input = cnv_details["input"]["bambais"]
+
+    errors = []
 
     # get and store name and file ID of all input and output files
     with concurrent.futures.ThreadPoolExecutor(max_workers=32) as executor:
         # submit jobs mapping each id to describe call
         concurrent_jobs = {
             executor.submit(
-                dxpy.describe, file, fields={"name": True, "id": True}
+                describe, file, fields={"name": True, "id": True}
             ): file
             for file in gcnv_input + gcnv_output
         }
@@ -136,11 +144,31 @@ def get_cnv_call_details(reports) -> dict:
             try:
                 data = future.result()
                 calling_files[data["name"]] = data["id"]
+
             except Exception as exc:
                 # catch any errors that might get raised during querying
                 print(
                     f"Error getting data for {concurrent_jobs[future]}: {exc}"
                 )
+                # Collect the error details for later reporting
+                report = concurrent_jobs[future]
+                error_info = {
+                    "report": report["describe"]["name"] if "describe" in report else "Unknown",
+                    "id": report.get("id", "Unknown"),
+                    "error": str(exc),
+                    "exception_type": type(exc).__name__
+                }
+                errors.append(error_info)
+
+    # After processing all reports, check if any errors occurred
+    if errors:
+        # Print summary of all errors
+        print(f"Encountered {len(errors)} errors during processing:")
+        for i, error in enumerate(errors, 1):
+            print(f"{i}. Report: {error['report']} - Error: {error['error']}")
+
+        # Raise exception with all errors collected
+        raise RuntimeError(f"Failed to process {len(errors)} reports. See logs for details.")
 
     print(f"Found {len(calling_files.keys())} gCNV input / output files")
 
@@ -213,21 +241,21 @@ def get_cnv_file_ids(reports, gcnv_dict) -> dict:
         # Get file 'details' of the CNV xlsx report so that we can query
         # the clinical indication and variant count. If file has no 'details'
         # set default return to "Unknown"
-        file_details = dxpy.DXFile(report["id"]).get_details()
+        file_details = DXFile(report["id"]).get_details()
         clin_ind = file_details.get("clinical_indication", "Unknown")
         cnv_variant_count = file_details.get("variants", "Unknown")
 
         gen_xlsx_job = report["describe"]["createdBy"]["job"]
 
-        excluded_regions_id = dxpy.bindings.dxjob.DXJob(
+        excluded_regions_id = DXJob(
             dxid=gen_xlsx_job
         ).describe()["input"]["additional_files"][0]["$dnanexus_link"]
 
         # Find the reports workflow analysis id
-        reports_analysis = dxpy.bindings.dxjob.DXJob(
+        reports_analysis = DXJob(
             dxid=gen_xlsx_job
         ).describe()["parentAnalysis"]
-        reports_details = dxpy.bindings.dxanalysis.DXAnalysis(
+        reports_details = DXAnalysis(
             dxid=reports_analysis
         ).describe()
 
@@ -352,7 +380,7 @@ def find_snv_files(reports) -> dict:
     Gather files related to SNV reports
 
     Args:
-        reports (list): List of SNV report dxpy describe dicts
+        reports (list): List of SNV report dicts from dxpy.describe
 
     Returns:
         snv_data (dict): Nested dictionary of files with sample name
@@ -404,7 +432,7 @@ def find_snv_files(reports) -> dict:
         # Get file 'details' of the SNV xlsx report so that we can query
         # the clinical indication and variant count. If file has no 'details'
         # set default return to "Unknown"
-        file_details = dxpy.DXFile(report["id"]).get_details()
+        file_details = DXFile(report["id"]).get_details()
         clinical_indication = file_details.get(
             "clinical_indication", "Unknown"
         )
@@ -414,14 +442,17 @@ def find_snv_files(reports) -> dict:
         job_id = report["describe"]["createdBy"]["job"]
 
         # Get the workflow id that included the job
-        report_parent_analysis = dxpy.bindings.dxjob.DXJob(dxid=job_id).describe()[
+        report_parent_analysis = DXJob(dxid=job_id).describe()[
             "parentAnalysis"
         ]
 
         # Get the vcf file id and athena coverage file id
-        report_parent_details = dxpy.bindings.dxanalysis.DXAnalysis(
-            dxid=report_parent_analysis
-        ).describe()
+        try:
+            report_parent_details = DXAnalysis(
+                    dxid=report_parent_analysis).describe()
+        except ResourceNotFound as e:
+            print(f"No parent analysis found for {job_id}")
+            raise(e)
         try:
             vcf_file = report_parent_details["input"]["stage-rpt_vep.vcf"]
         except KeyError:
@@ -447,50 +478,29 @@ def find_snv_files(reports) -> dict:
                 "No summary .txt file found in output of eggd_athena stage"
                 f" for SNV reports workflow ({report_parent_analysis})"
             )
+
         # Logic for extracting bam and bai files
-        mappings_bam = mappings_bai = None
-        parent_vcf_job_details = {}
-        # Extract the additional regions calling/sentieon job id from the vcf metadata
-        vcf_creation_job_id = dxpy.describe(vcf_file)["createdBy"][
-            "job"
-        ]
-        parent_vcf_job_details = dxpy.bindings.dxjob.DXJob(
-            dxid=vcf_creation_job_id
-        ).describe()
-        # Get the parent analysis id of the vcf job
-        parent_dias_single_analysis_id = (
-            parent_vcf_job_details.get("parentAnalysis", None)
-            )
-        if not parent_dias_single_analysis_id:
-            raise RuntimeError(
-                "No parent analysis found for dias-single workflow. "
-                f"Sample: {sample}, VCF job id: {vcf_creation_job_id}"
-                )
-
-        # Get the parent analysis details
-        dias_single_analysis_details = dxpy.bindings.dxanalysis.DXAnalysis(
-                dxid=parent_dias_single_analysis_id
-            ).describe()
-
-        if dias_single_analysis_details:
-            # Get bam & bai job id from sention job metadata
+        vcf_creation_job_id = describe(vcf_file)["createdBy"]["job"]
+        parent_vcf_job_details = DXJob(vcf_creation_job_id).describe()
+        executable_name = parent_vcf_job_details["executableName"]
+        if executable_name == "eggd_additional_regions_calling":
             try:
-                mappings_bam_stage = dias_single_analysis_details["output"]["stage-sentieon_dnaseq.mappings_bam"]
-                mappings_bam = mappings_bam_stage.get("$dnanexus_link", None)
-                mappings_bai_stage = dias_single_analysis_details["output"]["stage-sentieon_dnaseq.mappings_bam_bai"]
-                mappings_bai = mappings_bai_stage.get("$dnanexus_link", None)
-            except KeyError as err:
-                print(
-                    "No mappings bam or bai found in output of sentieon_dnaseq stage"
-                    f" for dias single workflow ({parent_dias_single_analysis_id})"
-                )
-                raise err
+                mappings_bam = parent_vcf_job_details["input"]["input_bam"]["$dnanexus_link"]
+                mappings_bai = parent_vcf_job_details["input"]["input_bai"]["$dnanexus_link"]
+            except KeyError:
+                print("No BAM/BAI found in input to {}".format(parent_vcf_job_details["id"]))
+                mappings_bam = None
+                mappings_bai = None
+        elif executable_name == "sentieon-dnaseq":
+            try:
+                mappings_bam = parent_vcf_job_details["output"]["mappings_bam"]["$dnanexus_link"]
+                mappings_bai = parent_vcf_job_details["output"]["mappings_bam_bai"]["$dnanexus_link"]
+            except KeyError:
+                print("No BAM/BAI found in output from {}".format(parent_vcf_job_details["id"]))
+                mappings_bam = None
+                mappings_bai = None
         else:
-            # If no parent analysis found
-            print("No parent analysis found for dias single workflow.")
-            raise RuntimeError(
-                "No parent analysis found for dias single workflow."
-            )
+            raise ValueError(f"The eggd_vep VCF input is an output from unsupported app {executable_name}. Exiting...")
 
         # Check all required fields are present
         if not all([
