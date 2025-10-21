@@ -83,6 +83,16 @@
       "help": ""
     },
     {
+      "name": "nmd_file",
+      "label": "CSV-formatted file containing NMD-detected samples",
+      "class": "file",
+      "optional": true,
+      "patterns": [
+          "*.csv"
+      ],
+      "help": ""
+    },
+    {
       "name": "session_files",
       "label": "array:file",
       "class": "array:file",
