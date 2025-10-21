@@ -1,10 +1,13 @@
 """General utility functions"""
 
 from __future__ import annotations
+import csv
 import os
-
+from pathlib import Path
+import logging
 import dxpy
 
+logger = logging.getLogger(__name__)
 
 def add_session_file_ids_to_job_output(all_sample_outputs, job_output) -> dict:
     """
@@ -212,6 +215,41 @@ def set_order_map(snv_only=False) -> dict:
         }
 
     return order_map
+
+
+def write_nmd_data(sample_names: list[str], r_codes: list[str], output_path: str | Path) -> None:
+    """
+    Generates a CSV report of NMD variants. No output is returned - this function only
+    dumps the statistics to a file.
+
+    The output is formatted as follows:
+
+    ```
+    Instrument_ID,Specimen_ID,Batch,R_code
+    <int>,<string>,<string>,<string>
+    ```
+
+    NMD variants are classified as those without either SNVs or CNVs
+
+    Parameters
+    ----------
+    sample_names: a list of sample names formatted as per the CUH standard
+    r_codes: a list of r_codes
+    output_path: path to write the result to
+
+    Returns
+    -------
+    None
+    """
+    if len(sample_names) != len(r_codes):
+        logger.error(f"sample_names and r_codes are different sizes; sample_names: {len(sample_names)}; r_codes: {len(r_codes)}")
+        raise ValueError
+    split_names = [name.split("_")[0:3] for name in sample_names]
+    output = [row + [r_code] for row, r_code in zip(split_names, r_codes)]
+    with open(output_path, "w") as f:
+        writer = csv.writer(f, fieldnames = ["Instrument_ID", "Specimen_ID", "Batch", "R_Code"])
+        writer.writeheader()
+        writer.writerows(output)
 
 
 def remove_unnecessary_outputs(
