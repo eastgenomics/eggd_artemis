@@ -3,7 +3,7 @@
   "title": "eggd_artemis",
   "summary": "Gathers required files and creates file containing urls for them",
   "dxapi": "1.0.0",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "inputSpec": [
     {
       "name": "snv_path",
@@ -70,6 +70,14 @@
       "class": "string",
       "optional": true,
       "help": "comma separated string of IGV reference tracks to select for including in the IGV session file"
+    },
+    {
+      "name": "debug_mode",
+      "label": "debug mode",
+      "class": "boolean",
+      "optional": true,
+      "default": false,
+      "help": "Debug mode. Will write the contents of a JSON somewhere sorry lorem ipsum I'll come back to this"
     }
   ],
   "outputSpec": [
@@ -91,6 +99,16 @@
         "*"
       ],
       "help": ""
+    },
+    {
+      "name": "debug_json",
+      "label": "Debug JSON",
+      "class": "file",
+      "optional": true,
+      "patterns": [
+          "*.json"
+      ],
+      "help": "this is the output debug. It is the all sample something lorem ipsum"
     }
   ],
   "runSpec": {
