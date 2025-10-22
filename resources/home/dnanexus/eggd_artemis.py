@@ -148,8 +148,20 @@ def main(
     multiqc_url = make_url(multiqc_report, project_id, url_duration)
 
     if debug_mode:
+        all_sample_outputs_debug = all_sample_outputs.copy()
+        # pandas DataFrame objects aren't compatible with json.dump, so need to be serialized
+        # to dict type before writing to file
+        for sample, sample_data in all_sample_outputs_debug.items():
+            for ci, variants in sample_data["clinical_indications"].items():
+                if "CNV" in variants:
+                    for cnv_report in variants["CNV"]:
+                        try:
+                            cnv_report["cnv_excluded_regions_df"] = cnv_report["cnv_excluded_regions_df"].to_dict()
+                        except AttributeError:
+                            continue
+
         with open("all_sample_outputs.json", "w") as f:
-            json.dump(all_sample_outputs, f, sort_keys=True, indent=2)
+            json.dump(all_sample_outputs_debug, f, sort_keys=True, indent=2)
 
     # Remove download URLs for reports with no variants in and remove
     # excluded regions dataframe if no excluded regions
@@ -184,6 +196,5 @@ def main(
     )
 
     return output
-
 
 dxpy.run()
