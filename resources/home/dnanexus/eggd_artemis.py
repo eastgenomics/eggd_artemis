@@ -3,6 +3,7 @@
 from glob import glob
 import dxpy
 import datetime
+import json
 import logging
 import pip
 
@@ -35,6 +36,7 @@ def main(
     bed_file=None,
     qc_status=None,
     multiqc_report=None,
+    debug_mode=None
 ):
     # Set up logging
     logger = logging.getLogger(__name__)
@@ -145,6 +147,10 @@ def main(
 
     multiqc_url = make_url(multiqc_report, project_id, url_duration)
 
+    if debug_mode:
+        with open("all_sample_outputs.json", "w") as f:
+            json.dump(all_sample_outputs, f, sort_keys=True, indent=2)
+
     # Remove download URLs for reports with no variants in and remove
     # excluded regions dataframe if no excluded regions
     all_sample_outputs = remove_unnecessary_outputs(
@@ -167,6 +173,11 @@ def main(
         filename=output_xlsx_file, folder=job_output_folder, tags=[expiry_date]
     )
     output["url_file"] = dxpy.dxlink(url_file)
+    if debug_mode:
+        debug_json = dxpy.upload_local_file(
+                filename="all_sample_outputs.json", folder=job_output_folder
+                )
+        output["debug_json"] = dxpy.dxlink(debug_json)
 
     output = add_session_file_ids_to_job_output(
         all_sample_outputs=all_sample_outputs, job_output=output
