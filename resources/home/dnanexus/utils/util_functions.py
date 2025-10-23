@@ -216,7 +216,7 @@ def set_order_map(snv_only=False) -> dict:
 
     return order_map
 
-def get_nmd_data(data: dict) -> tuple(list[str | None], list[str| None]):
+def get_nmd_data(data: dict) -> tuple[list[str | None], list[str| None]]:
     """
     Returns samples and their associated panels that are labelled as NMD.
     Samples and panels are filtered according to various conditions. These are as follows:
