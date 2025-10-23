@@ -248,8 +248,8 @@ def get_nmd_data(data: dict) -> tuple(list[str | None], list[str| None]):
     # The "default" is a dataframe with only one row - the column names. One of our checks is to look for instances where len(df) <= 1
     indices = ["a", "b", "c", "d", "e", "f", "g", "h", "i"]
     columns = ["CNV excluded regions", "Chrom", "Start", "End", "Length", "Gene_Symbol", "HGNC_ID", "Transcript", "Exon"]
-    excluded_regions = [{index: column} for index, column in zip(indices, columns)]
-    default_cnv_report = [{"CNV count": 0, "cnv_excluded_regions_df": pd.DataFrame(excluded_regions)}]
+    excluded_regions = [{index: column for index, column in zip(indices, columns)}]
+    default_cnv_report = [{"CNV count": 0, "cnv_excluded_regions_df": pd.DataFrame.from_dict(excluded_regions)}]
 
     for sample, sample_data in data.items():
         panels = sample_data["clinical_indications"]
