@@ -162,6 +162,13 @@ def main(
 
         with open("all_sample_outputs.json", "w") as f:
             json.dump(all_sample_outputs_debug, f, sort_keys=True, indent=2)
+            # uploading output before rest of job is finished
+            output = {}
+            debug_json = dxpy.upload_local_file(
+                    filename="all_sample_outputs.json", folder=job_output_folder
+                    )
+            output["debug_json"] = dxpy.dxlink(debug_json)
+
 
     # Remove download URLs for reports with no variants in and remove
     # excluded regions dataframe if no excluded regions
@@ -180,16 +187,12 @@ def main(
     )
 
     # Upload output to the platform
-    output = {}
+    if not debug_mode:
+        output = {}
     url_file = dxpy.upload_local_file(
         filename=output_xlsx_file, folder=job_output_folder, tags=[expiry_date]
     )
     output["url_file"] = dxpy.dxlink(url_file)
-    if debug_mode:
-        debug_json = dxpy.upload_local_file(
-                filename="all_sample_outputs.json", folder=job_output_folder
-                )
-        output["debug_json"] = dxpy.dxlink(debug_json)
 
     output = add_session_file_ids_to_job_output(
         all_sample_outputs=all_sample_outputs, job_output=output
