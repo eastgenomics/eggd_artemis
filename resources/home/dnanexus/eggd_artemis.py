@@ -150,7 +150,7 @@ def main(
 
     ## NMD reporting
     nmd_samples, nmd_panels = get_nmd_data(all_sample_outputs)
-    nmd_output_file = "nmd.csv"
+    nmd_output_file = "nmd_report.csv"
     if len(nmd_samples) > 0:
         write_nmd_data(nmd_samples, nmd_panels, output_path = nmd_output_file)
     else:
