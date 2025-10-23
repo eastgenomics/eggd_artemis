@@ -248,8 +248,8 @@ def write_nmd_data(sample_names: list[str], r_codes: list[str], output_path: str
     split_names = [name.split("-")[0:3] for name in sample_names]
     output = [row + [r_code] for row, r_code in zip(split_names, r_codes)]
     with open(output_path, "w") as f:
-        writer = csv.writer(f, fieldnames = ["Instrument_ID", "Specimen_ID", "Batch", "R_Code"])
-        writer.writeheader()
+        writer = csv.writer(f)
+        writer.writerow(["Instrument_ID", "Specimen_ID", "Batch", "R_Code"])
         writer.writerows(output)
 
 
