@@ -84,7 +84,7 @@
     },
     {
       "name": "nmd_file",
-      "label": "CSV-formatted file containing NMD-detected samples",
+      "label": "CSV-formatted file containing NMD samples and associated metadata",
       "class": "file",
       "patterns": [
           "*.csv"
