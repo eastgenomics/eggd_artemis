@@ -182,6 +182,9 @@ def main(
             nmd_panels.append(panel)
     if len(nmd_samples) > 0:
         write_nmd_data(nmd_samples, nmd_panels, output_path = nmd_output_file)
+    else:
+        with open(nmd_output_file, "w") as f:
+            f.write("Instrument_ID,Specimen_ID,Batch,R_Code\n")
 
     # Remove download URLs for reports with no variants in and remove
     # excluded regions dataframe if no excluded regions
@@ -205,9 +208,8 @@ def main(
         filename=output_xlsx_file, folder=job_output_folder, tags=[expiry_date]
     )
     output["url_file"] = dxpy.dxlink(url_file)
-    if nmd_output_file.exists():
-        nmd_dxfile = dxpy.upload_local_file(filename="nmd.csv", folder=job_output_folder)
-        output["nmd_file"] = dxpy.dxlink(nmd_dxfile)
+    nmd_dxfile = dxpy.upload_local_file(filename=nmd_output_file, folder=job_output_folder)
+    output["nmd_file"] = dxpy.dxlink(nmd_dxfile)
     output = add_session_file_ids_to_job_output(
         all_sample_outputs=all_sample_outputs, job_output=output
     )
