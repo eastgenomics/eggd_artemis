@@ -22,6 +22,7 @@ from utils.util_functions import (
     add_session_file_ids_to_job_output,
     initialise_project,
     remove_unnecessary_outputs,
+    get_nmd_data,
     write_nmd_data,
 )
 
@@ -148,34 +149,7 @@ def main(
     multiqc_url = make_url(multiqc_report, project_id, url_duration)
 
     ## NMD reporting
-    nmd_samples = []
-    nmd_panels = []
-
-    # setting up defaults - in some of the NMD checks, we want to replace missing data with empty data.
-    # We're only concerned with the count in the instance of SNVs
-    default_snv_report = [{"SNV count": 0}]
-    # The CNV report has only two entries that we check: the CNV count, and dataframe of missing regions.
-    # The "default" is a dataframe with only one row - the column names. One of our checks is to look for instances where len(df) <= 1
-    indices = ["a", "b", "c", "d", "e", "f", "g", "h", "i"]
-    columns = ["CNV excluded regions", "Chrom", "Start", "End", "Length", "Gene_Symbol", "HGNC_ID", "Transcript", "Exon"]
-    excluded_regions = [{index: column} for index, column in zip(indices, columns)]
-    default_cnv_report = [{"CNV count": 0, "cnv_excluded_regions_df": pd.DataFrame(excluded_regions)}]
-
-    for sample, sample_data in all_sample_outputs.items():
-        panels = sample_data["clinical_indications"]
-        if len(panels) == 1:
-            panel, variants = list(panels.items())[0]
-            reports = [variants.get(k, []) for k in ["SNV", "CNV"]]
-            counts = [len(report) for report in reports]
-            # Process the sample if and only if 1 SNV report and/or 1 CNV report exist
-            if counts in [[0, 1], [1, 0], [1, 1]]:
-                snv_report = variants.get("SNV", default_snv_report)[0]
-                cnv_report = variants.get("CNV", default_cnv_report)[0]
-                if int(snv_report["SNV count"]) == 0 and int(cnv_report["CNV count"]) == 0:
-                    if len(cnv_report["cnv_excluded_regions_df"]) <= 1:
-                        nmd_samples.append(sample)
-                        nmd_samples.append(panel)
-
+    nmd_samples, nmd_panels = get_nmd_data(all_sample_outputs)
     nmd_output_file = "nmd.csv"
     if len(nmd_samples) > 0:
         write_nmd_data(nmd_samples, nmd_panels, output_path = nmd_output_file)
