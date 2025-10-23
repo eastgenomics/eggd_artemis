@@ -222,11 +222,12 @@ def write_nmd_data(sample_names: list[str], r_codes: list[str], output_path: str
     Generates a CSV report of NMD variants. No output is returned - this function only
     dumps the statistics to a file.
 
-    The output is formatted as follows:
+    An example of the output is as follows:
 
     ```
     Instrument_ID,Specimen_ID,Batch,R_code
-    <int>,<string>,<string>,<string>
+    100033006,22363S0007,23TSO111,R1.111
+    100033006,22364S0011,23TSO111,R2.222
     ```
 
     NMD variants are classified as those without either SNVs or CNVs
