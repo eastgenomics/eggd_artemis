@@ -148,6 +148,7 @@ def main(
     multiqc_url = make_url(multiqc_report, project_id, url_duration)
 
     if debug_mode:
+        logger.info("DEBUG MODE ACTIVE: Capturing per sample outputs")
         all_sample_outputs_debug = all_sample_outputs.copy()
         # pandas DataFrame objects aren't compatible with json.dump, so need to be serialized
         # to dict type before writing to file
@@ -160,6 +161,7 @@ def main(
                         except AttributeError:
                             continue
 
+        logger.info("DEBUG MODE ACTIVE: Uploading per sample outputs JSON")
         with open("all_sample_outputs.json", "w") as f:
             json.dump(all_sample_outputs_debug, f, sort_keys=True, indent=2)
             # uploading output before rest of job is finished
@@ -174,10 +176,12 @@ def main(
 
     # Remove download URLs for reports with no variants in and remove
     # excluded regions dataframe if no excluded regions
+    logger.info("Removing links from samples without variants")
     all_sample_outputs = remove_unnecessary_outputs(
         all_sample_outputs, snv_reports=True, cnv_reports=True
     )
 
+    logger.info("Writing URL XLSX file")
     output_xlsx_file = write_output_file(
         all_sample_outputs,
         today,
@@ -189,6 +193,7 @@ def main(
     )
 
     # Upload output to the platform
+    logger.info("Uploading output")
     if not debug_mode:
         output = {}
     url_file = dxpy.upload_local_file(
