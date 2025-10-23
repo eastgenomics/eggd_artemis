@@ -165,7 +165,9 @@ def main(
             # uploading output before rest of job is finished
             output = {}
             debug_json = dxpy.upload_local_file(
-                    filename="all_sample_outputs.json", folder=job_output_folder
+                    filename="all_sample_outputs.json",
+                    folder=job_output_folder,
+                    wait_on_close=False
                     )
             output["debug_json"] = dxpy.dxlink(debug_json)
 
