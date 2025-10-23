@@ -277,15 +277,15 @@ def write_nmd_data(sample_names: list[str], r_codes: list[str], output_path: str
 
     ```
     Instrument_ID,Specimen_ID,Batch,R_code
-    100033006,22363S0007,23TSO111,R1.111
-    100033006,22364S0011,23TSO111,R2.222
+    100012003,29001S0001,29NGCEN1,R111.1
+    100012003,29001S0002,29NGCEN1,R222.2
     ```
 
     NMD variants are classified as those without either SNVs or CNVs
 
     Parameters
     ----------
-    sample_names: a list of sample names formatted as per the CUH standard
+    sample_names: a list of sample names formatted as per the CUH standard (e.g. 100012003-29001S0001-29NGCEN1-1234-F-12345678)
     r_codes: a list of r_codes
     output_path: path to write the result to
 
@@ -302,8 +302,6 @@ def write_nmd_data(sample_names: list[str], r_codes: list[str], output_path: str
         writer = csv.writer(f)
         writer.writerow(["Instrument_ID", "Specimen_ID", "Batch", "R_Code"])
         writer.writerows(output)
-
-
 
 def remove_unnecessary_outputs(
     all_sample_outputs, snv_reports, cnv_reports
