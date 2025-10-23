@@ -155,7 +155,7 @@ def main(
         write_nmd_data(nmd_samples, nmd_panels, output_path = nmd_output_file)
     else:
         with open(nmd_output_file, "w") as f:
-            f.write("Instrument_ID,Specimen_ID,Batch,R_Code\n")
+            f.write("Instrument_ID,Specimen_ID,Batch,R_code\n")
 
     # Remove download URLs for reports with no variants in and remove
     # excluded regions dataframe if no excluded regions

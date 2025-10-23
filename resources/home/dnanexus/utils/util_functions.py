@@ -301,7 +301,7 @@ def write_nmd_data(sample_names: list[str], r_codes: list[str], output_path: str
     output = [row + [r_code] for row, r_code in zip(split_names, r_codes)]
     with open(output_path, "w") as f:
         writer = csv.writer(f)
-        writer.writerow(["Instrument_ID", "Specimen_ID", "Batch", "R_Code"])
+        writer.writerow(["Instrument_ID", "Specimen_ID", "Batch", "R_code"])
         writer.writerows(output)
 
 def remove_unnecessary_outputs(
