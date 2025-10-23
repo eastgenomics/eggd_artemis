@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import logging
 import dxpy
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
