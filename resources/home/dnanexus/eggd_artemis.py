@@ -149,18 +149,39 @@ def main(
 
     ## handling NMDs
     nmd_samples = []
-    nmd_clinical_indications = []
-    nmd_output_file = Path(f"{job_output_folder}/nmd.csv")
-    for sample, output in all_sample_outputs.items():
-        clinical_indications = output["clinical_indications"]
-        for clin_ind, variants in clinical_indications.items():
-            snv_count = int(variants["SNV"][0]["SNV count"])
+    nmd_panels = []
+    nmd_output_file = "nmd.csv" # PLEASE HELP ME NAME THIS
+    for sample, sample_data in all_sample_outputs.items():
+        panels = sample_data["clinical_indications"]
+        if len(panels) != 1:
+            continue
+        panel, variants = list(panels.items())[0]
+        n_snv_reports = len(variants["SNV"])
+        if "CNV" not in variants:
+            n_cnv_reports = 0
+        else:
+            n_cnv_reports = len(variants["CNV"])
+        if n_snv_reports > 1 or n_cnv_reports > 1:
+            continue
+        elif n_snv_reports == 0 and n_cnv_reports == 0:
+            continue
+        snv_count = int(variants["SNV"][0]["SNV count"])
+        if n_cnv_reports == 1:
             cnv_count = int(variants["CNV"][0]["CNV count"])
-            if snv_count == 0 and cnv_count == 0:
-                nmd_samples.append(sample)
-                nmd_clinical_indications.append(clin_ind)
+            cnv_excluded_regions = variants["CNV"][0]["cnv_excluded_regions_df"]
+        else:
+            cnv_count = 0
+            cnv_excluded_regions = None
+        if snv_count > 0 or cnv_count > 0:
+            continue
+        elif cnv_excluded_regions is None:
+            nmd_samples.append(sample)
+            nmd_panels.append(panel)
+        elif len(cnv_excluded_regions) <= 1:
+            nmd_samples.append(sample)
+            nmd_panels.append(panel)
     if len(nmd_samples) > 0:
-        write_nmd_data(nmd_samples, nmd_clinical_indications, nmd_output_file)
+        write_nmd_data(nmd_samples, nmd_panels, output_path = nmd_output_file)
 
     # Remove download URLs for reports with no variants in and remove
     # excluded regions dataframe if no excluded regions
