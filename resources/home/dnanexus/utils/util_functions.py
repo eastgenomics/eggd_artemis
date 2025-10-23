@@ -244,7 +244,7 @@ def write_nmd_data(sample_names: list[str], r_codes: list[str], output_path: str
     if len(sample_names) != len(r_codes):
         logger.error(f"sample_names and r_codes are different sizes; sample_names: {len(sample_names)}; r_codes: {len(r_codes)}")
         raise ValueError
-    split_names = [name.split("_")[0:3] for name in sample_names]
+    split_names = [name.split("-")[0:3] for name in sample_names]
     output = [row + [r_code] for row, r_code in zip(split_names, r_codes)]
     with open(output_path, "w") as f:
         writer = csv.writer(f, fieldnames = ["Instrument_ID", "Specimen_ID", "Batch", "R_Code"])
