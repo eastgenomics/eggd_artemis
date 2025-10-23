@@ -1,10 +1,14 @@
 """General utility functions"""
 
 from __future__ import annotations
+import csv
 import os
-
+from pathlib import Path
+import logging
 import dxpy
+import pandas as pd
 
+logger = logging.getLogger(__name__)
 
 def add_session_file_ids_to_job_output(all_sample_outputs, job_output) -> dict:
     """
@@ -213,6 +217,92 @@ def set_order_map(snv_only=False) -> dict:
 
     return order_map
 
+def get_nmd_data(data: dict) -> tuple[list[str | None], list[str| None]]:
+    """
+    Returns samples and their associated panels that are labelled as NMD.
+    Samples and panels are filtered according to various conditions. These are as follows:
+
+    1. Only samples associated with one panel are returned
+    2. Samples must have only have this many reports attached to their panel:
+        a. 1 SNV report, 1 CNV report
+        b. 1 SNV report, 0 CNV reports
+        c. 0 SNV reports, 1 CNV reports
+    3. Where CNV reports are found, there must be no excluded regions reported
+
+    Parameters
+    ----------
+    data : dict
+        dict of all sample output data
+
+    Returns
+    -------
+    tuple[list, list]
+        A list of sample names and a list of panel names, mapped 1:1 w.r.t. each other
+    """
+    nmd_samples = []
+    nmd_panels = []
+
+    # setting up defaults - in some of the NMD checks, we want to replace missing data with empty data.
+    # We're only concerned with the count in the instance of SNVs
+    default_snv_report = [{"SNV count": 0}]
+    # The CNV report has only two entries that we check: the CNV count, and dataframe of missing regions.
+    # The "default" is a dataframe with only one row - the column names. One of our checks is to look for instances where len(df) <= 1
+    indices = ["a", "b", "c", "d", "e", "f", "g", "h", "i"]
+    columns = ["CNV excluded regions", "Chrom", "Start", "End", "Length", "Gene_Symbol", "HGNC_ID", "Transcript", "Exon"]
+    excluded_regions = [{index: column for index, column in zip(indices, columns)}]
+    default_cnv_report = [{"CNV count": 0, "cnv_excluded_regions_df": pd.DataFrame.from_dict(excluded_regions)}]
+
+    for sample, sample_data in data.items():
+        panels = sample_data["clinical_indications"]
+        if len(panels) == 1:
+            panel, variants = list(panels.items())[0]
+            reports = [variants.get(k, []) for k in ["SNV", "CNV"]]
+            counts = [len(report) for report in reports]
+            # Process the sample if and only if 1 SNV report and/or 1 CNV report exist
+            if counts in [[0, 1], [1, 0], [1, 1]]:
+                snv_report = variants.get("SNV", default_snv_report)[0]
+                cnv_report = variants.get("CNV", default_cnv_report)[0]
+                if int(snv_report["SNV count"]) == 0 and int(cnv_report["CNV count"]) == 0:
+                    if len(cnv_report["cnv_excluded_regions_df"]) <= 1:
+                        nmd_samples.append(sample)
+                        nmd_panels.append(panel)
+
+    return nmd_samples, nmd_panels
+
+def write_nmd_data(sample_names: list[str], r_codes: list[str], output_path: str | Path) -> None:
+    """
+    Generates a CSV report of NMD variants. No output is returned - this function only
+    dumps the statistics to a file.
+
+    An example of the output is as follows:
+
+    ```
+    Instrument_ID,Specimen_ID,Batch,R_code
+    100012003,29001S0001,29NGCEN1,R111.1
+    100012003,29001S0002,29NGCEN1,R222.2
+    ```
+
+    NMD variants are classified as those without either SNVs or CNVs
+
+    Parameters
+    ----------
+    sample_names: a list of sample names formatted as per the CUH standard (e.g. 100012003-29001S0001-29NGCEN1-1234-F-12345678)
+    r_codes: a list of r_codes
+    output_path: path to write the result to
+
+    Returns
+    -------
+    None
+    """
+    if len(sample_names) != len(r_codes):
+        logger.error(f"sample_names and r_codes are different sizes; sample_names: {len(sample_names)}; r_codes: {len(r_codes)}")
+        raise ValueError
+    split_names = [name.split("-")[0:3] for name in sample_names]
+    output = [row + [r_code] for row, r_code in zip(split_names, r_codes)]
+    with open(output_path, "w") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Instrument_ID", "Specimen_ID", "Batch", "R_code"])
+        writer.writerows(output)
 
 def remove_unnecessary_outputs(
     all_sample_outputs, snv_reports, cnv_reports

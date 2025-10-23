@@ -5,6 +5,7 @@ import dxpy
 import datetime
 import logging
 import pip
+from pathlib import Path
 
 pip.main(["install", "--no-index", "--no-deps", *glob("packages/*")])
 
@@ -21,6 +22,8 @@ from utils.util_functions import (
     add_session_file_ids_to_job_output,
     initialise_project,
     remove_unnecessary_outputs,
+    get_nmd_data,
+    write_nmd_data,
 )
 
 
@@ -145,6 +148,15 @@ def main(
 
     multiqc_url = make_url(multiqc_report, project_id, url_duration)
 
+    ## NMD reporting
+    nmd_samples, nmd_panels = get_nmd_data(all_sample_outputs)
+    nmd_output_file = "nmd_report.csv"
+    if len(nmd_samples) > 0:
+        write_nmd_data(nmd_samples, nmd_panels, output_path = nmd_output_file)
+    else:
+        with open(nmd_output_file, "w") as f:
+            f.write("Instrument_ID,Specimen_ID,Batch,R_code\n")
+
     # Remove download URLs for reports with no variants in and remove
     # excluded regions dataframe if no excluded regions
     all_sample_outputs = remove_unnecessary_outputs(
@@ -167,12 +179,12 @@ def main(
         filename=output_xlsx_file, folder=job_output_folder, tags=[expiry_date]
     )
     output["url_file"] = dxpy.dxlink(url_file)
-
+    nmd_dxfile = dxpy.upload_local_file(filename=nmd_output_file, folder=job_output_folder)
+    output["nmd_file"] = dxpy.dxlink(nmd_dxfile)
     output = add_session_file_ids_to_job_output(
         all_sample_outputs=all_sample_outputs, job_output=output
     )
 
     return output
-
 
 dxpy.run()

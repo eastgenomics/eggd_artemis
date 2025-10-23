@@ -3,7 +3,7 @@
   "title": "eggd_artemis",
   "summary": "Gathers required files and creates file containing urls for them",
   "dxapi": "1.0.0",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "inputSpec": [
     {
       "name": "snv_path",
@@ -79,6 +79,15 @@
       "class": "file",
       "patterns": [
         "*"
+      ],
+      "help": ""
+    },
+    {
+      "name": "nmd_file",
+      "label": "CSV-formatted file containing NMD samples and associated metadata",
+      "class": "file",
+      "patterns": [
+          "*.csv"
       ],
       "help": ""
     },
